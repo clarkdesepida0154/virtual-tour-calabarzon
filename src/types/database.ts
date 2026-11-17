@@ -55,6 +55,12 @@ export type DestinationSummary = Pick<
   'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url'
 >;
 
+/** What the map needs: where a destination is and how to label its pin. */
+export type DestinationPin = Pick<
+  Destination,
+  'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url'
+> & { latitude: number; longitude: number };
+
 // ---------------------------------------------------------------------------
 // destination_images (Phase 2 photo gallery)
 // ---------------------------------------------------------------------------
@@ -112,6 +118,11 @@ export type QuizOptionInsert = {
 };
 
 export type QuizOptionUpdate = Partial<QuizOptionInsert>;
+
+/** One question with its four options, as the quiz screen loads it. */
+export type QuizQuestionWithOptions = QuizQuestion & {
+  options: Pick<QuizOption, 'id' | 'option_text' | 'is_correct'>[];
+};
 
 // ---------------------------------------------------------------------------
 // quiz_attempts / destination_completions (Phase 2 progress tracking)

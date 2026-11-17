@@ -13,6 +13,7 @@ import type {
   Database,
   Destination,
   DestinationInsert,
+  DestinationPin,
   DestinationSummary,
   DestinationUpdate,
 } from '@/types/database';
@@ -72,6 +73,20 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     return data;
   }
 
+  /** Every destination that has coordinates, with what its map pin needs. */
+  async function listPins(): Promise<DestinationPin[]> {
+    const { data, error } = await client
+      .from(TABLE)
+      .select(`${SUMMARY_COLUMNS}, latitude, longitude`)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .order('name', { ascending: true });
+    if (error) throw toAppError(error, 'We couldn’t load the map.');
+    return data.filter(
+      (row): row is DestinationPin => row.latitude !== null && row.longitude !== null,
+    );
+  }
+
   /** One full destination, or `null` when it does not exist (or was deleted). */
   async function getById(id: string): Promise<Destination | null> {
     const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
@@ -108,7 +123,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     if (error) throw toAppError(error, 'We couldn’t delete the destination.');
   }
 
-  return { list, getById, create, update, remove };
+  return { list, listPins, getById, create, update, remove };
 }
 
 export type DestinationsRepository = ReturnType<typeof createDestinationsRepository>;

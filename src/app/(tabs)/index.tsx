@@ -119,7 +119,7 @@ export default function HomeScreen() {
               message="The collection is empty. Add the first place worth visiting in CALABARZON."
               actionLabel="Add a destination"
               actionIcon="plus"
-              onAction={() => router.navigate('/add')}
+              onAction={() => router.push('/add')}
             />
           ) : (
             <FlatList

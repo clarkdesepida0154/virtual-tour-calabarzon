@@ -55,6 +55,24 @@ export const colors = {
   photoShadeStrong: 'rgba(42, 36, 32, 0.88)',
   pressed: 'rgba(42, 36, 32, 0.08)',
 
+  /** The dark "gallery wall" behind full-bleed photos in the virtual tour. */
+  exhibit: '#1C1814',
+  onExhibitSoft: 'rgba(255, 255, 255, 0.64)',
+  onExhibitFaint: 'rgba(255, 255, 255, 0.32)',
+  /** Frosted round buttons laid over photos. */
+  glass: 'rgba(28, 24, 20, 0.48)',
+
+  /**
+   * One colour per destination category, for map pins and the map legend.
+   * Each sits on a clearly different hue, because Google Maps tints its
+   * default pins by hue only.
+   */
+  categoryHistorical: '#9A3B26',
+  categoryChurch: '#6B4E8C',
+  categoryMuseum: '#C9A227',
+  categoryNature: '#2F5D46',
+  categoryHeritage: '#2E6C8E',
+
   transparent: 'transparent',
 } as const;
 
@@ -132,6 +150,26 @@ export const layout = {
   /** Dialogs never grow taller than this share of the screen. */
   dialogMaxHeightRatio: 0.6,
   pressedOpacity: 0.86,
+  /** Small map card on the Details screen. */
+  mapPreviewHeight: 168,
+  /** Diameter and stroke of the Progress tab's completion ring. */
+  progressRingSize: 136,
+  progressRingStroke: 10,
+  /** Gallery page dots in the virtual tour. */
+  pageDot: 8,
+  pageDotActive: 22,
+  /** Thin segments of the virtual tour's step indicator. */
+  stepSegmentHeight: 3,
+  /** Letter badge (A–D) on a quiz option. */
+  optionBadge: 34,
+  /** Round emblem on the Welcome screen and the tour's completion step. */
+  emblem: 88,
+  /** Share of the screen height used by the Welcome photo. */
+  welcomePhotoRatio: 0.5,
+  /** Space kept clear at the bottom of the Explore list for the add button. */
+  fabClearance: 96,
+  /** Province completion bars on the Progress tab. */
+  meterHeight: 8,
 } as const;
 
 export const motion = {
@@ -140,6 +178,10 @@ export const motion = {
   skeletonPulse: 750,
   searchDebounce: 300,
   toast: 3200,
+  /** Step-to-step transition in the virtual tour and the quiz. */
+  step: 320,
+  /** Map camera moves. */
+  camera: 600,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -195,12 +237,45 @@ export const typography = {
   input: { fontFamily: fonts.body, fontSize: 16 },
   /** Serif initial inside the round province badge. */
   monogram: { fontFamily: fonts.display, fontSize: 20, lineHeight: 26 },
+  /** Virtual tour: the destination name on the intro plate. */
+  exhibitTitle: { fontFamily: fonts.display, fontSize: 38, lineHeight: 46 },
+  /** Virtual tour: chapter headings (History, Cultural Significance). */
+  chapterTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 40 },
+  /** Virtual tour: the opening sentence of a chapter, set like a museum label lead. */
+  lead: { fontFamily: fonts.displayItalic, fontSize: 20, lineHeight: 31 },
+  /** Body text of the tour chapters: a touch larger and airier than bodyLarge. */
+  reading: { fontFamily: fonts.body, fontSize: 17, lineHeight: 29 },
+  /** The question on a quiz card. */
+  question: { fontFamily: fonts.displaySemiBold, fontSize: 24, lineHeight: 32 },
+  /** Big numbers: quiz score, progress ring. */
+  score: { fontFamily: fonts.display, fontSize: 52, lineHeight: 60 },
+  stat: { fontFamily: fonts.display, fontSize: 26, lineHeight: 32 },
 } satisfies Record<string, TextStyle>;
 
 export type TypographyToken = keyof typeof typography;
 
 /** Largest OS font-scale the layouts are designed to absorb. */
 export const maxFontScale = 1.3;
+
+// ---------------------------------------------------------------------------
+// Google Maps style (Android): warm, quiet base map so the pins carry colour
+// ---------------------------------------------------------------------------
+
+export const mapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#F2EADC' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#5C5149' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#FAF6EF' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#FFFFFF' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#E8DFD0' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#CFC3B1' }] },
+  { featureType: 'administrative.province', elementType: 'labels.text.fill', stylers: [{ color: '#8A6D10' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#EDE4D3' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C8D9DE' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5B7C86' }] },
+];
 
 // ---------------------------------------------------------------------------
 // react-native-paper (Material Design 3) theme

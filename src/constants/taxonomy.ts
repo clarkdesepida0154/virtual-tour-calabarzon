@@ -7,6 +7,7 @@
  * it in plain Node through the repository layer.
  */
 import type { IconName } from '@/components/AppIcon';
+import type { ColorToken } from '@/theme';
 
 export const PROVINCES = ['Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'] as const;
 export type Province = (typeof PROVINCES)[number];
@@ -29,6 +30,8 @@ type CategoryMeta = {
   shortLabel: string;
   /** One-line explanation shown on the Home category tiles. */
   blurb: string;
+  /** Colour of this category's map pins and legend chip. */
+  color: ColorToken;
 };
 
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
@@ -36,26 +39,31 @@ export const CATEGORY_META: Record<Category, CategoryMeta> = {
     icon: 'bank-outline',
     shortLabel: 'Historical',
     blurb: 'Shrines and landmarks of the nation’s story',
+    color: 'categoryHistorical',
   },
   'Church & Religious': {
     icon: 'church-outline',
     shortLabel: 'Churches',
     blurb: 'Centuries-old churches and places of faith',
+    color: 'categoryChurch',
   },
   'Museum & Art': {
     icon: 'palette-outline',
     shortLabel: 'Museums & Art',
     blurb: 'Galleries, collections and ancient art',
+    color: 'categoryMuseum',
   },
   'Natural Wonder': {
     icon: 'waterfall',
     shortLabel: 'Nature',
     blurb: 'Falls, lakes, volcanoes and mountains',
+    color: 'categoryNature',
   },
   'Heritage Town & Culture': {
     icon: 'home-group',
     shortLabel: 'Heritage & Culture',
     blurb: 'Old towns, traditions and living culture',
+    color: 'categoryHeritage',
   },
 };
 

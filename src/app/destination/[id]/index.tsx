@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Animated, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,16 +11,21 @@ import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
+import { BestScoreBadge, VisitedBadge } from '@/components/Badges';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CoverImage } from '@/components/CoverImage';
 import { DetailsBodySkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag, ProvinceTag } from '@/components/Tag';
+import { MapPreview } from '@/components/map/MapPreview';
+import { CATEGORY_META } from '@/constants/taxonomy';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
+import { useDestinationProgress } from '@/hooks/useProgress';
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
+import { hasCoordinates } from '@/lib/mapRegion';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
 import { colors, elevation, iconSize, layout, radius, spacing } from '@/theme';
 import type { Destination } from '@/types/database';
@@ -41,6 +46,8 @@ export default function DestinationDetailsScreen() {
   const query = useDestination(id);
   // The photo rows carry each picture's credit line (author and licence).
   const images = useDestinationImages(id);
+  // Has the current user toured this place, and how did their quizzes go?
+  const progress = useDestinationProgress(id);
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -174,6 +181,15 @@ export default function DestinationDetailsScreen() {
               </AppText>
               <View style={styles.rule} />
 
+              {progress.data && (progress.data.visited || progress.data.best) ? (
+                <View style={styles.tags}>
+                  {progress.data.visited ? <VisitedBadge /> : null}
+                  {progress.data.best ? (
+                    <BestScoreBadge score={progress.data.best.score} total={progress.data.best.total} />
+                  ) : null}
+                </View>
+              ) : null}
+
               <View style={styles.facts}>
                 <View style={styles.fact}>
                   <AppIcon name="map-marker-outline" size="md" color="primary" />
@@ -202,6 +218,42 @@ export default function DestinationDetailsScreen() {
                 {destination.description}
               </AppText>
 
+              <TourInvite
+                visited={progress.data?.visited ?? false}
+                onStart={() =>
+                  router.push({ pathname: '/destination/[id]/tour', params: { id: destination.id } })
+                }
+              />
+
+              {hasCoordinates(destination) ? (
+                <Pressable
+                  onPress={() =>
+                    router.navigate({
+                      pathname: '/map',
+                      params: { focus: destination.id, at: String(Date.now()) },
+                    })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${destination.name} on the map`}
+                  style={({ pressed }) => [styles.mapCard, pressed && styles.pressed]}>
+                  <View style={styles.mapFrame}>
+                    <MapPreview
+                      latitude={destination.latitude}
+                      longitude={destination.longitude}
+                      pinColor={colors[CATEGORY_META[destination.category].color]}
+                      label={`Map showing where ${destination.name} is`}
+                    />
+                  </View>
+                  <View style={styles.mapFooter}>
+                    <AppIcon name="map-marker-radius-outline" size="sm" color="primary" />
+                    <AppText variant="label" color="ink" style={styles.flex}>
+                      View on the map
+                    </AppText>
+                    <AppIcon name="arrow-right" size="sm" color="primary" />
+                  </View>
+                </Pressable>
+              ) : null}
+
               {destination.history ? (
                 <StorySection
                   icon="book-open-page-variant-outline"
@@ -225,6 +277,35 @@ export default function DestinationDetailsScreen() {
                   </AppText>
                 </View>
               ) : null}
+
+              {/* Collection management (Phase 1 CRUD) */}
+              <View style={styles.manage}>
+                <AppText variant="overline" color="muted">
+                  Manage this entry
+                </AppText>
+                <View style={styles.manageRow}>
+                  <AppButton
+                    label="Edit"
+                    icon="pencil-outline"
+                    variant="secondary"
+                    onPress={() =>
+                      router.push({ pathname: '/destination/[id]/edit', params: { id: destination.id } })
+                    }
+                    disabled={isDeleting}
+                    style={styles.flex}
+                    accessibilityHint="Opens the edit form"
+                  />
+                  <AppButton
+                    label="Delete"
+                    icon="trash-can-outline"
+                    variant="danger"
+                    onPress={() => setConfirmVisible(true)}
+                    disabled={isDeleting}
+                    style={styles.flex}
+                    accessibilityHint="Asks for confirmation first"
+                  />
+                </View>
+              </View>
             </>
           ) : (
             <DetailsBodySkeleton />
@@ -252,27 +333,29 @@ export default function DestinationDetailsScreen() {
         </Animated.View>
       </View>
 
-      {/* Edit / Delete */}
+      {/* The two ways to learn about this place */}
       {destination ? (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + spacing.md }]}>
           <AppButton
-            label="Edit"
-            icon="pencil-outline"
+            label="Start Virtual Tour"
+            icon="walk"
             onPress={() =>
-              router.push({ pathname: '/destination/[id]/edit', params: { id: destination.id } })
+              router.push({ pathname: '/destination/[id]/tour', params: { id: destination.id } })
+            }
+            disabled={isDeleting}
+            style={styles.tourButton}
+            accessibilityHint="Opens a guided, full-screen tour with photos, history and culture"
+          />
+          <AppButton
+            label={progress.data?.best ? `Quiz · ${progress.data.best.score}/${progress.data.best.total}` : 'Quiz'}
+            icon="help-circle-outline"
+            variant="secondary"
+            onPress={() =>
+              router.push({ pathname: '/destination/[id]/quiz', params: { id: destination.id } })
             }
             disabled={isDeleting}
             style={styles.flex}
-            accessibilityHint="Opens the edit form"
-          />
-          <AppButton
-            label="Delete"
-            icon="trash-can-outline"
-            variant="danger"
-            onPress={() => setConfirmVisible(true)}
-            disabled={isDeleting}
-            style={styles.flex}
-            accessibilityHint="Asks for confirmation first"
+            accessibilityHint="Five multiple-choice questions about this destination"
           />
         </View>
       ) : null}
@@ -292,6 +375,33 @@ export default function DestinationDetailsScreen() {
         onCancel={() => setConfirmVisible(false)}
       />
     </View>
+  );
+}
+
+/** A framed invitation to the guided tour, inside the page. */
+function TourInvite({ visited, onStart }: { visited: boolean; onStart: () => void }) {
+  return (
+    <Pressable
+      onPress={onStart}
+      accessibilityRole="button"
+      accessibilityLabel={visited ? 'Take the virtual tour again' : 'Start the virtual tour'}
+      style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
+      <View style={styles.inviteIcon}>
+        <AppIcon name="bank-outline" size="lg" color="secondary" />
+      </View>
+      <View style={styles.flex}>
+        <AppText variant="overline" color="secondary">
+          {visited ? 'Visited · tour again' : 'Virtual tour'}
+        </AppText>
+        <AppText variant="cardTitleSmall" color="onPrimary">
+          Step inside the exhibit
+        </AppText>
+        <AppText variant="caption" color="onPrimaryMuted">
+          Gallery, history and cultural significance — one chapter at a time.
+        </AppText>
+      </View>
+      <AppIcon name="chevron-right" size="md" color="onPrimary" />
+    </Pressable>
   );
 }
 
@@ -342,6 +452,58 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  tourButton: {
+    flex: 1.6,
+  },
+  pressed: {
+    opacity: layout.pressedOpacity,
+  },
+  invite: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.exhibit,
+    ...elevation.raised,
+  },
+  inviteIcon: {
+    width: layout.iconBadge + spacing.xs,
+    height: layout.iconBadge + spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: layout.hairline,
+    borderColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapCard: {
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+    ...elevation.card,
+  },
+  mapFrame: {
+    height: layout.mapPreviewHeight,
+    backgroundColor: colors.surfaceMuted,
+  },
+  mapFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  manage: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: layout.hairline,
+    borderTopColor: colors.outline,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
   centered: {
     marginTop: spacing.xxxl,

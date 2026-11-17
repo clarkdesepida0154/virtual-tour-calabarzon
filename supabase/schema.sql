@@ -98,7 +98,9 @@ create table public.quiz_options (
   is_correct  boolean not null default false
 );
 
--- Phase 2: progress tracking (no auth — keyed by an anonymous device id).
+-- Phase 2: progress tracking. `device_id` holds a generic "user key": the
+-- Supabase auth user id for a signed-in user, or a random device UUID for a
+-- guest (see src/context/IdentityContext.tsx).
 create table public.quiz_attempts (
   id             uuid primary key default gen_random_uuid(),
   destination_id uuid not null references public.destinations (id) on delete cascade,
@@ -149,8 +151,17 @@ create trigger destinations_set_updated_at
 -- @section rls
 -- -----------------------------------------------------------------------------
 -- ROW LEVEL SECURITY
--- School project with no sign-in: the app's publishable key maps to the `anon`
--- role, which gets full read/write access through permissive policies.
+-- School project, deliberately permissive. Guests use the publishable key as
+-- the `anon` role; signed-in users (email + password) make the same requests
+-- as the `authenticated` role. Both get the same full read/write access, so
+-- signing in never removes a feature. (Policy names keep their original
+-- `_anon_` suffix; scripts/lib/verify.js looks them up by name.)
+--
+-- PRODUCTION NOTE: in a real deployment the progress tables would be scoped
+-- per user, e.g. for authenticated users
+--   using (device_id = auth.uid()::text) with check (device_id = auth.uid()::text)
+-- and guests would get a signed device token (or anonymous sign-in) instead
+-- of a client-chosen key, and catalogue writes would be limited to editors.
 -- -----------------------------------------------------------------------------
 do $$
 declare
@@ -166,19 +177,19 @@ begin
   ]
   loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('grant select, insert, update, delete on public.%I to anon', t);
+    execute format('grant select, insert, update, delete on public.%I to anon, authenticated', t);
 
     execute format(
-      'create policy %I on public.%I for select to anon using (true)',
+      'create policy %I on public.%I for select to anon, authenticated using (true)',
       t || '_anon_select', t);
     execute format(
-      'create policy %I on public.%I for insert to anon with check (true)',
+      'create policy %I on public.%I for insert to anon, authenticated with check (true)',
       t || '_anon_insert', t);
     execute format(
-      'create policy %I on public.%I for update to anon using (true) with check (true)',
+      'create policy %I on public.%I for update to anon, authenticated using (true) with check (true)',
       t || '_anon_update', t);
     execute format(
-      'create policy %I on public.%I for delete to anon using (true)',
+      'create policy %I on public.%I for delete to anon, authenticated using (true)',
       t || '_anon_delete', t);
   end loop;
 end $$;
@@ -189,7 +200,7 @@ notify pgrst, 'reload schema';
 
 -- @section storage
 -- -----------------------------------------------------------------------------
--- STORAGE: public bucket for destination photos + anon read/write policies
+-- STORAGE: public bucket for destination photos + read/write policies (guests and signed-in users)
 -- -----------------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -205,18 +216,18 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 create policy "destination_images_anon_select"
-  on storage.objects for select to anon
+  on storage.objects for select to anon, authenticated
   using (bucket_id = 'destination-images');
 
 create policy "destination_images_anon_insert"
-  on storage.objects for insert to anon
+  on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'destination-images');
 
 create policy "destination_images_anon_update"
-  on storage.objects for update to anon
+  on storage.objects for update to anon, authenticated
   using (bucket_id = 'destination-images')
   with check (bucket_id = 'destination-images');
 
 create policy "destination_images_anon_delete"
-  on storage.objects for delete to anon
+  on storage.objects for delete to anon, authenticated
   using (bucket_id = 'destination-images');

@@ -13,13 +13,15 @@ type Props = {
   label: string;
   style?: StyleProp<ViewStyle>;
   fallbackIconSize?: IconSizeToken;
+  /** `contain` shows the whole photo (tour gallery); default `cover` fills the frame. */
+  fit?: 'cover' | 'contain';
 };
 
 /**
  * A destination photo. Shows a warm placeholder tone while loading and a
  * quiet "no photo" mark when there is no image or it fails to load.
  */
-export function CoverImage({ uri, label, style, fallbackIconSize = 'xl' }: Props) {
+export function CoverImage({ uri, label, style, fallbackIconSize = 'xl', fit = 'cover' }: Props) {
   // Remember which URL failed, so a new URL gets a fresh attempt.
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showFallback = !uri || failedUri === uri;
@@ -34,7 +36,7 @@ export function CoverImage({ uri, label, style, fallbackIconSize = 'xl' }: Props
         <Image
           source={{ uri }}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit={fit}
           transition={motion.normal}
           cachePolicy="memory-disk"
           recyclingKey={uri}

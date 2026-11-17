@@ -29,6 +29,10 @@ import {
   storagePathFromPublicUrl,
 } from '../src/repositories/destinationImages.ts';
 import { buildSearchFilter, createDestinationsRepository } from '../src/repositories/destinations.ts';
+import { createProgressRepository } from '../src/repositories/progress.ts';
+import { createQuizRepository } from '../src/repositories/quiz.ts';
+import { bestScoresByDestination, summarizeProgress } from '../src/lib/progress.ts';
+import { prepareQuiz, scoreQuiz } from '../src/lib/quiz.ts';
 
 const MARKER = '[verify-crud]';
 const BUCKET_MARKER = '/storage/v1/object/public/destination-images/';
@@ -61,6 +65,12 @@ const client = createClient(url, key, {
 });
 const destinations = createDestinationsRepository(client);
 const images = createDestinationImagesRepository(client);
+const quiz = createQuizRepository(client);
+const progress = createProgressRepository(client);
+
+/** Throwaway "user key" for the progress checks; every row it writes is removed. */
+const TEST_USER_KEY = `verify-crud-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const TEST_GUEST_KEY = `${TEST_USER_KEY}-guest`;
 
 // --- tiny test harness ---
 let passed = 0;
@@ -435,7 +445,92 @@ async function main() {
     uploadedUrl = null;
   });
 
+  // --- Phase 2: quiz + progress, under a throwaway user key ---
+  const [first, second] = await destinations.list().catch(() => []);
+
+  await check('quiz repository: 5 questions in order, 4 options each, exactly 1 correct', async () => {
+    const questions = await quiz.getForDestination(first.id);
+    expect(questions.length === 5, `expected 5 questions, got ${questions.length}`);
+    expect(sameList(questions.map((q) => q.sort_order), [1, 2, 3, 4, 5]), 'questions out of order');
+    for (const q of questions) {
+      expect(q.options.length === 4, `${q.id}: ${q.options.length} options`);
+      expect(q.options.filter((o) => o.is_correct).length === 1, `${q.id}: not exactly 1 correct`);
+    }
+    // Scoring the real quiz: all-correct answers give 5/5 after shuffling.
+    const shuffled = prepareQuiz(questions);
+    const answers = Object.fromEntries(shuffled.map((q) => [q.id, q.options.find((o) => o.is_correct).id]));
+    const result = scoreQuiz(shuffled, answers);
+    expect(result.score === 5 && result.percent === 100, `perfect answers scored ${result.score}`);
+  });
+
+  await check('recordAttempt() writes a quiz_attempts row under the user key', async () => {
+    const row = await progress.recordAttempt({ userKey: TEST_USER_KEY, destinationId: first.id, score: 3, total: 5 });
+    expect(row.device_id === TEST_USER_KEY && row.score === 3 && row.total === 5, 'row does not match');
+    const listed = await progress.listAttempts(TEST_USER_KEY);
+    expect(listed.length === 1 && listed[0].id === row.id, 'attempt not listed for the user key');
+  });
+
+  await check('best score is the highest attempt, not the latest', async () => {
+    await progress.recordAttempt({ userKey: TEST_USER_KEY, destinationId: first.id, score: 5, total: 5 });
+    await progress.recordAttempt({ userKey: TEST_USER_KEY, destinationId: first.id, score: 4, total: 5 });
+    await progress.recordAttempt({ userKey: TEST_USER_KEY, destinationId: second.id, score: 2, total: 5 });
+    const forFirst = await progress.listAttempts(TEST_USER_KEY, first.id);
+    expect(forFirst.length === 3, `expected 3 attempts for the first destination, got ${forFirst.length}`);
+    const best = bestScoresByDestination(await progress.listAttempts(TEST_USER_KEY));
+    expect(best.get(first.id)?.score === 5, `best for first = ${best.get(first.id)?.score}`);
+    expect(best.get(second.id)?.score === 2, `best for second = ${best.get(second.id)?.score}`);
+  });
+
+  await check('markVisited() is idempotent per user key (unique constraint holds)', async () => {
+    const one = await progress.markVisited(TEST_USER_KEY, first.id);
+    const two = await progress.markVisited(TEST_USER_KEY, first.id);
+    expect(one.id === two.id, 'a second visit created a new row');
+    expect(one.completed_at === two.completed_at, 'the first visit date was overwritten');
+    const visits = await progress.listCompletions(TEST_USER_KEY);
+    expect(visits.length === 1, `expected 1 completion, got ${visits.length}`);
+    expect((await progress.getCompletion(TEST_USER_KEY, second.id)) === null, 'unvisited place reported as visited');
+  });
+
+  await check('progress is isolated per user key', async () => {
+    expect((await progress.listCompletions(TEST_GUEST_KEY)).length === 0, 'another key sees completions');
+    expect((await progress.listAttempts(TEST_GUEST_KEY)).length === 0, 'another key sees attempts');
+  });
+
+  await check('Progress tab summary from live rows: 1 visited, 4 quizzes, best 5/5, average 70%', async () => {
+    const summary = summarizeProgress(
+      await destinations.list(),
+      await progress.listCompletions(TEST_USER_KEY),
+      await progress.listAttempts(TEST_USER_KEY),
+    );
+    expect(summary.totalDestinations >= 26, 'catalogue not loaded');
+    expect(summary.visitedCount === 1, `visited ${summary.visitedCount}`);
+    expect(summary.quizzesTaken === 4, `quizzes ${summary.quizzesTaken}`);
+    expect(summary.best?.score === 5, 'best score wrong');
+    expect(summary.averagePercent === 70, `average ${summary.averagePercent} (expected (60+100+80+40)/4 = 70)`);
+    expect(summary.journey.length === 2, `journey has ${summary.journey.length} entries`);
+  });
+
+  await check('transferProgress() moves guest rows onto an account, without duplicate visits', async () => {
+    await progress.markVisited(TEST_GUEST_KEY, first.id); // also visited by the account: dropped
+    await progress.markVisited(TEST_GUEST_KEY, second.id); // new for the account: moved
+    await progress.recordAttempt({ userKey: TEST_GUEST_KEY, destinationId: second.id, score: 1, total: 5 });
+    await progress.transferProgress(TEST_GUEST_KEY, TEST_USER_KEY);
+    expect((await progress.listCompletions(TEST_GUEST_KEY)).length === 0, 'guest visits left behind');
+    expect((await progress.listAttempts(TEST_GUEST_KEY)).length === 0, 'guest attempts left behind');
+    expect((await progress.listCompletions(TEST_USER_KEY)).length === 2, 'account should now have 2 visits');
+    expect((await progress.listAttempts(TEST_USER_KEY)).length === 5, 'account should now have 5 attempts');
+  });
+
+  await check('removeAllFor() clears every row of the test user key', async () => {
+    await progress.removeAllFor(TEST_USER_KEY);
+    await progress.removeAllFor(TEST_GUEST_KEY);
+    expect((await progress.listCompletions(TEST_USER_KEY)).length === 0, 'completions remain');
+    expect((await progress.listAttempts(TEST_USER_KEY)).length === 0, 'attempts remain');
+  });
+
   // --- clean-up, even after failures ---
+  await progress.removeAllFor(TEST_USER_KEY).catch(() => {});
+  await progress.removeAllFor(TEST_GUEST_KEY).catch(() => {});
   const leftovers = await destinations.list({ search: MARKER }).catch(() => []);
   for (const row of leftovers) await destinations.remove(row.id).catch(() => {});
   if (uploadedUrl) await images.removeByPublicUrl(uploadedUrl);

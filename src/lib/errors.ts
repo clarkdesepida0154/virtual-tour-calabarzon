@@ -2,7 +2,7 @@
  * One error type for the whole app, so screens can show a friendly message
  * and pick the right illustration without knowing about Supabase.
  */
-export type AppErrorKind = 'network' | 'not-found' | 'config' | 'unknown';
+export type AppErrorKind = 'network' | 'not-found' | 'config' | 'auth' | 'unknown';
 
 export class AppError extends Error {
   readonly kind: AppErrorKind;
@@ -21,6 +21,7 @@ const TITLES: Record<AppErrorKind, string> = {
   network: 'No connection',
   'not-found': 'Not found',
   config: 'Setup needed',
+  auth: 'Couldn’t continue',
   unknown: 'Something went wrong',
 };
 

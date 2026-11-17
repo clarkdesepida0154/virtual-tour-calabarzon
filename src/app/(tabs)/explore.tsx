@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FAB } from 'react-native-paper';
 
 import { AppText } from '@/components/AppText';
 import { DestinationCard } from '@/components/DestinationCard';
@@ -16,7 +17,7 @@ import { useExploreFilters } from '@/context/ExploreFiltersContext';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDestinations } from '@/hooks/useDestinations';
 import { pluralize } from '@/lib/format';
-import { colors, layout, motion, spacing } from '@/theme';
+import { colors, layout, motion, radius, spacing } from '@/theme';
 import type { DestinationSummary } from '@/types/database';
 
 const CATEGORY_OPTIONS: FilterOption<Category>[] = CATEGORIES.map((category) => ({
@@ -134,13 +135,23 @@ export default function ExploreScreen() {
                 message="The collection is empty. Add the first place worth visiting in CALABARZON."
                 actionLabel="Add a destination"
                 actionIcon="plus"
-                onAction={() => router.navigate('/add')}
+                onAction={() => router.push('/add')}
                 style={styles.state}
               />
             )
           }
         />
       )}
+
+      <FAB
+        icon="plus"
+        label="Add"
+        onPress={() => router.push('/add')}
+        color={colors.onPrimary}
+        style={styles.fab}
+        accessibilityLabel="Add a destination"
+        accessibilityHint="Opens the form for a new destination"
+      />
     </View>
   );
 }
@@ -175,7 +186,7 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: layout.snackbarOffset,
+    paddingBottom: layout.fabClearance,
     gap: spacing.lg,
     width: '100%',
     maxWidth: layout.maxContentWidth,
@@ -196,5 +207,12 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: layout.pressedOpacity,
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
   },
 });

@@ -53,10 +53,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="add"
+        name="map"
         options={{
-          title: 'Add',
-          tabBarIcon: tabIcon('plus-circle', 'plus-circle-outline'),
+          title: 'Map',
+          tabBarIcon: tabIcon('map-marker-radius', 'map-marker-radius-outline'),
+        }}
+      />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarIcon: tabIcon('medal', 'medal-outline'),
         }}
       />
     </Tabs>

@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,22 +7,26 @@ import { useToast } from '@/context/ToastContext';
 import { colors } from '@/theme';
 import type { Destination } from '@/types/database';
 
+/** Add a destination. Opened from the "Add" button on Explore. */
 export default function AddDestinationScreen() {
   const router = useRouter();
   const { showToast } = useToast();
-  // Changing the key remounts the form, which clears it for the next entry.
-  const [formKey, setFormKey] = useState(0);
+
+  const leave = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/explore');
+  };
 
   const handleSaved = (destination: Destination) => {
-    setFormKey((key) => key + 1);
     showToast(`“${destination.name}” was added.`);
-    router.push({ pathname: '/destination/[id]', params: { id: destination.id } });
+    // Swap the form for the new destination's page, so Back returns to Explore.
+    router.replace({ pathname: '/destination/[id]', params: { id: destination.id } });
   };
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader overline="New entry" title="Add a Destination" divider />
-      <DestinationForm key={formKey} onSaved={handleSaved} />
+      <ScreenHeader overline="New entry" title="Add a Destination" onBack={leave} divider />
+      <DestinationForm onSaved={handleSaved} onCancel={leave} />
     </View>
   );
 }

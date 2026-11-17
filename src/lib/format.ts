@@ -23,3 +23,35 @@ export function formatCoordinates(
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+/**
+ * Splits a text into its opening sentence (set as a museum-label lead) and
+ * the rest. Abbreviations such as "St." or "Gen." do not end a sentence.
+ * Returns `lead: null` when no sensible first sentence is found.
+ */
+export function splitLead(text: string, maxLeadLength = 240): { lead: string | null; rest: string } {
+  const trimmed = text.trim();
+  const sentenceEnd = /([.!?])\s+(?=[A-Z0-9“"‘'(])/g;
+  let match: RegExpExecArray | null;
+  while ((match = sentenceEnd.exec(trimmed)) !== null) {
+    const end = match.index + 1;
+    const lastWord = trimmed.slice(0, match.index).split(/\s+/).pop() ?? '';
+    // "St", "Gen", "Fr", "Sto", "No" … and initials like "J" are abbreviations.
+    if (lastWord.length <= 3 && /^[A-Z]/.test(lastWord) && match[1] === '.') continue;
+    if (end > maxLeadLength) break;
+    return { lead: trimmed.slice(0, end), rest: trimmed.slice(end).trim() };
+  }
+  return { lead: null, rest: trimmed };
+}
+
+/** "17 November 2026", or the raw value if it cannot be read as a date. */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  try {
+    return date.toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
