@@ -17,10 +17,8 @@ const API = 'https://commons.wikimedia.org/w/api.php';
 /** Downloads are cached on disk so re-runs never ask Commons for the same file twice. */
 const HTTP_CACHE_DIR = path.resolve(__dirname, '..', '..', '.cache', 'commons', 'http');
 
-/** Pause between media downloads. Commons throttles bursts; this pace was never refused. */
-const MEDIA_INTERVAL_MS = 10000;
-/** How long to leave Commons alone after it answers "too many requests". */
-const COOL_DOWN_MINUTES = 20;
+/** Pause between media downloads — a courtesy; renditions were never refused at this pace. */
+const MEDIA_INTERVAL_MS = 3000;
 
 /** Commons asks automated clients to identify themselves. */
 const USER_AGENT =
@@ -151,28 +149,31 @@ function tidyAuthor(artistHtml) {
 // ---------------------------------------------------------------------------
 
 /**
- * The URL of a scaled rendition ("thumbnail") of a Commons file.
+ * How photos are downloaded — this cost hours to learn, so read it.
  *
- * IMPORTANT: always download a rendition, never the original upload. Commons
- * answers anonymous scripts that fetch original files with HTTP 429 every
- * time, while renditions at its standard widths are served normally. So we
- * ask for the largest standard width that is not wider than the wanted size
- * and still narrower than the original (Commons will not scale up).
+ * Commons has two media hosts:
+ *   - thumb.wikimedia.org serves scaled renditions ("thumbnails"). Scripts may
+ *     fetch these.
+ *   - upload.wikimedia.org serves the original uploads. It answers scripts
+ *     with HTTP 429 "Too many requests" every single time — it is not a
+ *     temporary rate limit, and waiting or retrying never helps.
  *
- * Renditions live at /thumb/<a>/<ab>/<name>/<width>px-<name>.
+ * The API tells us the right address: with `iiurlwidth`, `imageinfo` returns a
+ * `thumburl` on thumb.wikimedia.org. We use that URL as given and never build
+ * media URLs by hand (a hand-built path lands on the upload host and is
+ * refused). If the original is narrower than the width asked for, the API
+ * returns the original instead, so we ask again for a narrower standard width.
  */
-function renditionUrl(originalUrl, originalWidth, wantedWidth) {
-  // The API appends tracking parameters (?utm_source=…) to file URLs; drop them.
-  const base = originalUrl.split('?')[0];
-  const width = STANDARD_WIDTHS.find((step) => step <= wantedWidth && step < originalWidth);
-  if (!width) return base;
-  const name = base.split('/').pop();
-  return `${base.replace('/commons/', '/commons/thumb/')}/${width}px-${name}`;
+
+/** True when the API gave us a scaled rendition rather than the original file. */
+function isRenditionUrl(url) {
+  return typeof url === 'string' && /\/thumb\//.test(url) && /\/\d+px-/.test(url);
 }
 
 const IMAGE_PROPS = {
   prop: 'imageinfo',
   iiprop: 'url|size|mime|extmetadata',
+  iiurlwidth: String(DOWNLOAD_WIDTH),
   iiextmetadatafilter: 'LicenseShortName|LicenseUrl|Artist|ImageDescription|Restrictions',
 };
 
@@ -185,7 +186,8 @@ function normalize(page) {
     title: page.title, // "File:Example.jpg"
     pageUrl: info.descriptionurl,
     originalUrl: info.url,
-    downloadUrl: renditionUrl(info.url, info.width, DOWNLOAD_WIDTH),
+    // Null when the original is narrower than DOWNLOAD_WIDTH; see resolveRenditions().
+    downloadUrl: isRenditionUrl(info.thumburl) ? info.thumburl : null,
     width: info.width,
     height: info.height,
     mime: info.mime,
@@ -288,41 +290,64 @@ async function filesByTitle(titles) {
     }
     await sleep(150);
   }
+  await resolveRenditions([...found.values()]);
   return found;
 }
 
-/** A small rendition for contact sheets. */
+/**
+ * A small rendition for contact sheets: the API's own rendition URL with only
+ * the width changed. Returns null when no rendition is known for the file.
+ */
 function thumbUrl(file, width = THUMB_WIDTH) {
-  return renditionUrl(file.originalUrl, file.width, width);
+  if (!file.downloadUrl) return null;
+  return file.downloadUrl.replace(/\/\d+px-/, `/${width}px-`);
+}
+
+/**
+ * Fills in `downloadUrl` for files whose original is narrower than
+ * DOWNLOAD_WIDTH by asking the API for the next standard width down.
+ */
+async function resolveRenditions(files) {
+  for (const width of STANDARD_WIDTHS.filter((step) => step < DOWNLOAD_WIDTH && step >= 960)) {
+    const pending = files.filter((file) => !file.downloadUrl && file.width > width);
+    for (let index = 0; index < pending.length; index += 20) {
+      const batch = pending.slice(index, index + 20);
+      const data = await api({
+        action: 'query',
+        prop: 'imageinfo',
+        iiprop: 'url',
+        iiurlwidth: String(width),
+        titles: batch.map((file) => file.title).join('|'),
+      });
+      for (const page of (data.query && data.query.pages) || []) {
+        const url = page.imageinfo && page.imageinfo[0] && page.imageinfo[0].thumburl;
+        const file = batch.find((item) => item.title === page.title);
+        if (file && isRenditionUrl(url)) file.downloadUrl = url;
+      }
+    }
+  }
+  return files;
 }
 
 let lastMediaRequest = 0;
 
 /** Thrown when Commons answers "too many requests"; callers must stop asking. */
 class CommonsThrottledError extends Error {
-  constructor(retryAfterSeconds) {
+  constructor(url) {
     super(
-      'Wikimedia Commons is refusing downloads from this network right now (HTTP 429). ' +
-        `Send it nothing for at least ${COOL_DOWN_MINUTES} minutes, then run the command again — ` +
-        'photos already downloaded are kept, so it resumes where it stopped.',
+      'Wikimedia Commons refused the download (HTTP 429). ' +
+        (String(url).includes('//upload.wikimedia.org/')
+          ? 'The URL is on upload.wikimedia.org, which never serves scripts — use the rendition URL the API returns (thumb.wikimedia.org).'
+          : 'Stop sending requests, wait a while, then run the command again; photos already downloaded are kept.'),
     );
     this.name = 'CommonsThrottledError';
-    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
 /**
  * Downloads a media file politely: cached on disk, one request at a time with
- * a pause in between — and it STOPS at the first "too many requests" answer.
- *
- * What was learned the hard way while building the dataset:
- *   - Commons throttles by public IP, on its media host only (the API keeps
- *     working). The block is announced with HTTP 429 and `Retry-After: 120`.
- *   - Asking again after those two minutes does not help; a client that keeps
- *     polling just stays blocked. So there is deliberately no retry loop here.
- *   - Requesting an ORIGINAL upload instead of a rendition is what first
- *     triggered the block, which is why `renditionUrl()` never returns one for
- *     a photo-sized file.
+ * a pause in between — and it STOPS at the first "too many requests" answer
+ * instead of retrying, because retrying a refused URL never succeeds.
  */
 async function download(url) {
   const cacheFile = path.join(
@@ -342,7 +367,7 @@ async function download(url) {
   }
 
   if (response.status === 429) {
-    throw new CommonsThrottledError(Number(response.headers.get('retry-after')) || 120);
+    throw new CommonsThrottledError(url);
   }
   if (!response.ok) throw new Error(`Download failed (HTTP ${response.status}): ${url}`);
 
@@ -354,6 +379,7 @@ async function download(url) {
 
 module.exports = {
   CommonsThrottledError,
+  resolveRenditions,
   DOWNLOAD_WIDTH,
   MIN_SOURCE_WIDTH,
   USER_AGENT,

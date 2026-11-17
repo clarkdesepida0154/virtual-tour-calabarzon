@@ -1599,7 +1599,8 @@
         "Wikipedia's statement that the boat ride dates from the Spanish era with a written account from 1894 could not be double-verified and was left out.",
         "The 2023 three-town agreement rests on a partly paywalled Manila Times report and search summaries of DOT and Manila Bulletin coverage that could not be fetched.",
         "Quiz Q1 originally offered \"Pagsanjan\" as a wrong option for where the falls are; it was replaced with \"Lumban\" so the question does not work as a trick."
-      ]
+      ],
+      "image_review": "The cover comes from a small original, so it is 1280px wide instead of 1600px. Many files in the Commons category 'Pagsanjan Falls' actually show other waterfalls, so the choice of genuine photos of the main falls is narrow."
     },
     {
       "slug": "nagcarlan-underground-cemetery",
@@ -3492,7 +3493,8 @@
         "Statements that the chapel is a replica of the original chapel in Caleruega, Spain, the 'Spanish-Moorish' style label, and the former place name 'Gulod sa Batulao' appear only in blogs or a single source and were left out.",
         "The motto appears as 'Close to Nature, Closer to God' in the Davao Catholic Herald and as 'Closer to Nature, Closer to God' in another source; the first form is used.",
         "The name is fixed as 'Caleruega Church', but the building is a chapel within a retreat center, not a parish church; the text explains this."
-      ]
+      ],
+      "image_review": "The best available cover is a small original, so it is 1280px wide instead of 1600px. It is sharp on a phone but worth replacing if a larger photo of the chapel appears on Commons. Gallery-1 is a portrait photo."
     },
     {
       "slug": "anilao",
@@ -3511,12 +3513,12 @@
         {
           "role": "cover",
           "file": "cover.jpg",
-          "commons_title": "File:Boats of Anilao, Batangas.jpg",
-          "author": "Aldrin J. Garces (ag)",
+          "commons_title": "File:Moving life at coral-reef, Anilao, Batangas - panoramio.jpg",
+          "author": "andre oortgijs",
           "license": "CC BY-SA 3.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Boats_of_Anilao,_Batangas.jpg",
-          "caption": "Photo: Aldrin J. Garces (ag), CC BY-SA 3.0, via Wikimedia Commons"
+          "source_url": "https://commons.wikimedia.org/wiki/File:Moving_life_at_coral-reef,_Anilao,_Batangas_-_panoramio.jpg",
+          "caption": "Photo: andre oortgijs, CC BY-SA 3.0, via Wikimedia Commons"
         },
         {
           "role": "gallery",
@@ -3531,12 +3533,12 @@
         {
           "role": "gallery",
           "file": "gallery-2.jpg",
-          "commons_title": "File:Moving life at coral-reef, Anilao, Batangas - panoramio.jpg",
-          "author": "andre oortgijs",
+          "commons_title": "File:Boats of Anilao, Batangas.jpg",
+          "author": "Aldrin J. Garces (ag)",
           "license": "CC BY-SA 3.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Moving_life_at_coral-reef,_Anilao,_Batangas_-_panoramio.jpg",
-          "caption": "Photo: andre oortgijs, CC BY-SA 3.0, via Wikimedia Commons"
+          "source_url": "https://commons.wikimedia.org/wiki/File:Boats_of_Anilao,_Batangas.jpg",
+          "caption": "Photo: Aldrin J. Garces (ag), CC BY-SA 3.0, via Wikimedia Commons"
         }
       ],
       "quiz": [
@@ -4200,12 +4202,12 @@
         {
           "role": "gallery",
           "file": "gallery-2.jpg",
-          "commons_title": "File:Antipolo Cathedral Retablo (Post-2023 Renovation).jpg",
-          "author": "Chris25689",
-          "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Antipolo_Cathedral_Retablo_(Post-2023_Renovation).jpg",
-          "caption": "Photo: Chris25689, CC BY-SA 4.0, via Wikimedia Commons"
+          "commons_title": "File:InternationalShrineAntipolo.jpg",
+          "author": "Jeff Basina",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:InternationalShrineAntipolo.jpg",
+          "caption": "Photo: Jeff Basina, CC BY 4.0, via Wikimedia Commons"
         }
       ],
       "quiz": [
@@ -5261,7 +5263,8 @@
         "Wikipedia says a 'healing dome' completed in November 2022 was named the Healing Church of the Risen Christ; this could not be confirmed in a second source and is not stated in the text.",
         "No official shrine or diocesan web page with a history of the site was found; the account rests on Wikipedia and national newspapers. No heritage declaration (NHCP, National Museum) was found for this modern site.",
         "'One of the most heavily visited pilgrimage sites in Quezon during Holy Week' is attributed to press reports (Inquirer coverage cites police crowd estimates); visitor numbers are intentionally omitted."
-      ]
+      ],
+      "image_review": "Wikimedia Commons has only six usable freely licensed photos of the shrine. The cover shows the hill and its grounds; the statue of the Ascending Christ is clearest in gallery-1, which is a portrait photo. Replace the cover if a better landscape photo of the statue is uploaded to Commons."
     },
     {
       "slug": "malagonlong-bridge",
@@ -5280,22 +5283,22 @@
         {
           "role": "cover",
           "file": "cover.jpg",
-          "commons_title": "File:The Puente de Malagonlong.jpg",
-          "author": "EMMAN A. FORONDA",
-          "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:The_Puente_de_Malagonlong.jpg",
-          "caption": "Photo: EMMAN A. FORONDA, CC BY-SA 4.0, via Wikimedia Commons"
-        },
-        {
-          "role": "gallery",
-          "file": "gallery-1.jpg",
           "commons_title": "File:Puente de Malagonlong (Malagonlong Bridge).jpg",
           "author": "Allan Fesalbon Castañeda",
           "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
           "source_url": "https://commons.wikimedia.org/wiki/File:Puente_de_Malagonlong_(Malagonlong_Bridge).jpg",
           "caption": "Photo: Allan Fesalbon Castañeda, CC BY-SA 4.0, via Wikimedia Commons"
+        },
+        {
+          "role": "gallery",
+          "file": "gallery-1.jpg",
+          "commons_title": "File:The Puente de Malagonlong.jpg",
+          "author": "EMMAN A. FORONDA",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:The_Puente_de_Malagonlong.jpg",
+          "caption": "Photo: EMMAN A. FORONDA, CC BY-SA 4.0, via Wikimedia Commons"
         },
         {
           "role": "gallery",
@@ -5720,12 +5723,12 @@
         {
           "role": "cover",
           "file": "cover.jpg",
-          "commons_title": "File:Pahiyas Festival Quezon.jpg",
-          "author": "Yla Corotan",
-          "license": "CC BY-SA 3.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Pahiyas_Festival_Quezon.jpg",
-          "caption": "Photo: Yla Corotan, CC BY-SA 3.0, via Wikimedia Commons"
+          "commons_title": "File:Pahiyas Festival, Lucban, Quezon, Jul 2024.jpg",
+          "author": "Ralff Nestor Nacor",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Pahiyas_Festival,_Lucban,_Quezon,_Jul_2024.jpg",
+          "caption": "Photo: Ralff Nestor Nacor, CC BY-SA 4.0, via Wikimedia Commons"
         },
         {
           "role": "gallery",

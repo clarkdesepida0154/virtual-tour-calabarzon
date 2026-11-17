@@ -226,27 +226,14 @@ database to sample data.
 
 ### Downloading from Wikimedia Commons — read before fetching photos
 
-Commons throttles automated media downloads by public IP, and getting it wrong
-cost hours during Run 2. The rules now built into `scripts/lib/commons.js`:
+A misdiagnosed block cost hours in Run 2. What is actually true (built into `scripts/lib/commons.js`):
 
-- **Never request an original upload.** Ask for a rendition at one of the
-  standard widths (1920, 1280, 960 …) that is narrower than the original;
-  `renditionUrl()` does this. Fetching originals is what first triggered the
-  block.
-- **One file at a time, about one every 10 seconds.** 36 photos in a row went
-  through at that pace without a refusal.
-- **Stop at the first HTTP 429.** The answer says `Retry-After: 120`, but a
-  client that asks again after two minutes — or keeps polling — stays blocked.
-  `download()` therefore throws `CommonsThrottledError` and the scripts stop.
-  Leave Commons completely alone for 20+ minutes, then re-run; photos already
-  saved in `data/images` are kept, so it resumes.
-- Only the media host (`upload.wikimedia.org`) is throttled this way; the API
-  on `commons.wikimedia.org` keeps working, so shortlist photos from metadata
-  (title, description, size, licence) and download only the few you will use.
-  Do not build big thumbnail contact sheets.
-- Do not switch to another endpoint or network to get around a block, and do
-  not put personal contact details in the User-Agent. Wait instead.
-- Because `data/images` is committed, seeding never needs Commons at all.
+- **Use the API's `thumburl` verbatim.** It points at `thumb.wikimedia.org` and downloads fine for scripts.
+- **`upload.wikimedia.org` always answers scripts with HTTP 429** — originals and any hand-built thumbnail path. It is not a temporary rate limit; waiting does not help. Never build rendition URLs yourself.
+- If an original is narrower than the requested width the API returns the original URL (429). `resolveRenditions()` re-queries at narrower standard widths (1280, 960) to get a thumb URL.
+- Pace downloads (~3 s apart); `download()` throws `CommonsThrottledError` on a 429 and does not retry.
+- Use a generic User-Agent; never put personal contact details in it. Fetch from Commons only.
+- `data/images` is committed, so seeding never needs Commons.
 
 ## Conventions
 
@@ -374,7 +361,7 @@ Phase 1
 Content (Run 2)
 
 - [x] Full dataset: 26 destinations with verified description, history, cultural significance, address and coordinates
-- [ ] Real photos: 78 freely licensed Wikimedia Commons images (cover + 2 gallery each) — chosen and credited in the dataset; 39 of 78 downloaded and processed so far (Commons throttled the rest; run `npm run images:fetch` after a cool-down, then `npm run db:seed`)
+- [x] Real photos: 78 freely licensed Wikimedia Commons images (cover + 2 gallery each), processed, credited and committed in data/images
 - [x] Quiz bank: 130 questions (5 per destination), each answerable from the destination's own text
 - [x] `db:setup` / `db:seed` load the real dataset; placeholder seeds retired for good
 - [x] Lists load light summaries; Featured picks a varied, daily-rotating set

@@ -78,7 +78,9 @@ async function buildSheet(files, outFile) {
     const left = GAP + (index % COLUMNS) * (CELL_WIDTH + GAP);
     const top = GAP + Math.floor(index / COLUMNS) * rowHeight;
     try {
-      const thumb = await commons.download(commons.thumbUrl(file));
+      const url = commons.thumbUrl(file);
+      if (!url) throw new Error('no rendition');
+      const thumb = await commons.download(url);
       const cell = await sharp(thumb)
         .resize(CELL_WIDTH, CELL_HEIGHT, { fit: 'contain', background: '#dddddd' })
         .jpeg()
@@ -158,6 +160,8 @@ async function main() {
     console.log(`${options.name}: no usable files found.`);
     return;
   }
+
+  await commons.resolveRenditions(files);
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const suffix = options.page > 1 ? `-p${options.page}` : '';

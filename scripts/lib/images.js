@@ -111,6 +111,9 @@ async function ensureImages(
         if (!commons.isAcceptableLicense(file.rawLicense)) {
           throw new Error(`licence is now "${file.rawLicense}", which is not accepted`);
         }
+        if (!file.downloadUrl) {
+          throw new Error('Commons offers no scaled rendition of this file (the original is too small)');
+        }
         const source = await commons.download(file.downloadUrl);
         const processed = await processPhoto(source);
         fs.mkdirSync(path.dirname(item.local), { recursive: true });
