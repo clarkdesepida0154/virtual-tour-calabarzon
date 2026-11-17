@@ -19,7 +19,8 @@ Supabase. It runs entirely inside **Expo Go** — no native build needed.
 | **Add / Edit** | One shared form with validation, dropdowns for category and province, optional coordinates, and a photo picker that resizes to 1600px and uploads to Supabase Storage. |
 
 Phase 2 (virtual tour mode, quizzes, progress tracking, maps) is not built yet,
-but the database already has the tables for it. See `CLAUDE.md` for the roadmap.
+but its content is already in the database: every destination has a photo
+gallery and a quiz. See `CLAUDE.md` for the roadmap.
 
 ## Run it on your Android phone
 
@@ -61,21 +62,41 @@ SUPABASE_DB_URL=
 
 Restart `npx expo start` after changing `.env`.
 
+## Content: 26 destinations
+
+The app ships with a complete dataset of 26 major CALABARZON destinations —
+5 in Cavite, 6 in Laguna, 5 in Batangas, 5 in Rizal and 5 in Quezon. Each has a
+short description, a history, a note on its cultural significance, a verified
+address and coordinates, three photos, and a five-question quiz.
+
+It all lives in one reviewable file, `data/destinations-seed.json`, together
+with the sources each entry was checked against and a list of the claims that
+were deliberately softened ("often cited as…") because sources disagree.
+
+**Photos** come only from [Wikimedia Commons](https://commons.wikimedia.org),
+under public-domain, CC0, CC BY or CC BY-SA terms. The resized copies are in
+`data/images/`, and `data/IMAGE_CREDITS.md` lists the author and licence of
+every one. In the app, the credit is shown on each destination's page.
+
 ## Database
 
-Everything about the database lives in one file, `supabase/schema.sql`: the six
-tables, Row Level Security policies, the public `destination-images` storage
-bucket, and six sample destinations.
+- `supabase/schema.sql` creates the structure: six tables, Row Level Security
+  policies and the public `destination-images` storage bucket.
+- `data/destinations-seed.json` is the content that gets loaded into it.
 
 | Command | What it does |
 | --- | --- |
-| `npm run db:setup` | Runs `schema.sql` against Supabase, then verifies it. **This resets the data** — every destination is replaced by the six samples. |
-| `npm run db:verify` | Checks the tables, policies, bucket and row count without changing anything. |
-| `npm run db:test` | Exercises the app's real data layer against the live project (create, read, update, delete, search, filters, photo upload) and cleans up after itself. |
+| `npm run db:setup` | **Full reset.** Recreates the tables, then loads the 26 destinations with their photos and quizzes, then verifies. Destinations added from the app are removed. |
+| `npm run db:seed` | Reloads the 26 destinations without recreating the tables. Safe to run repeatedly. |
+| `npm run db:verify` | Checks the live database without changing anything: 26 destinations, each with a cover photo, 3 photo rows and 5 valid quiz questions, and that photo links work. |
+| `npm run db:test` | Exercises the app's real data layer against the live project (read, search, filters, create, update, delete, photo upload) and cleans up after itself. |
+| `npm run data:check` | Validates the dataset file offline, including that every quiz answer can be found in that destination's own text. |
+| `npm run images:fetch` | Downloads and resizes any photo named in the dataset that is missing from `data/images`. |
+| `npm run images:find` | Helper for choosing photos: builds a contact sheet of usable Commons images. |
 
-`db:setup` connects with `SUPABASE_DB_URL`. Supabase's direct database host is
-IPv6-only, so if it is unreachable the script automatically tries the IPv4
-connection poolers and saves the one that works back into `.env`.
+The setup scripts connect with `SUPABASE_DB_URL`. Supabase's direct database
+host is IPv6-only, so if the saved address stops working the script tries the
+IPv4 connection poolers and saves the one that works back into `.env`.
 
 ## Project layout
 
@@ -92,8 +113,12 @@ src/
   repositories/        The only code that talks to Supabase
   theme/               Design tokens: colours, type, spacing
   types/               Handwritten database types
-supabase/schema.sql    Database schema + seed data
-scripts/               db-setup.js, verify-crud.mjs
+data/
+  destinations-seed.json   The content: 26 destinations, photos, quizzes
+  images/                  Processed photos, one folder per destination
+  IMAGE_CREDITS.md         Author and licence of every photo
+supabase/schema.sql    Database structure
+scripts/               Setup, seeding, verification and photo tools
 ```
 
 ## Checks
@@ -101,15 +126,16 @@ scripts/               db-setup.js, verify-crud.mjs
 ```bash
 npm run typecheck   # TypeScript, strict
 npm run lint        # ESLint (Expo config)
+npm run data:check  # the dataset file
+npm run db:verify   # the live database holds the full dataset
 npm run db:test     # data layer against the live database
 ```
 
 ## Known limitations
 
-- The six sample destinations use **placeholder photos** from picsum.photos.
-  They are not pictures of the real places. The full 25-destination dataset
-  with real photos comes in the next iteration.
+- The quizzes and photo galleries are in the database, but the screens that
+  use them (virtual tour mode, quiz, progress tracking) are not built yet.
 - No map yet — coordinates are stored and shown as text only.
-- Virtual tour mode, quizzes and progress tracking (Phase 2) are not built.
 - There is no sign-in: anyone using the app can add, edit and delete
-  destinations. That is intentional for this school project.
+  destinations. That is intentional for this school project. Running
+  `npm run db:seed` restores the original 26.

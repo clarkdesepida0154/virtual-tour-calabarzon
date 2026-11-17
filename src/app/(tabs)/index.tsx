@@ -24,7 +24,7 @@ import type { ExploreFilters } from '@/context/ExploreFiltersContext';
 import { useHomeData } from '@/hooks/useDestinations';
 import { pluralize } from '@/lib/format';
 import { colors, elevation, layout, radius, spacing } from '@/theme';
-import type { Destination } from '@/types/database';
+import type { DestinationSummary } from '@/types/database';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -48,7 +48,7 @@ export default function HomeScreen() {
     setQuery('');
   };
 
-  const openDestination = (destination: Destination) =>
+  const openDestination = (destination: DestinationSummary) =>
     router.push({ pathname: '/destination/[id]', params: { id: destination.id } });
 
   return (

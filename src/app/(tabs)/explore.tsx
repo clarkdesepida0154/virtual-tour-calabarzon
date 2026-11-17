@@ -17,7 +17,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDestinations } from '@/hooks/useDestinations';
 import { pluralize } from '@/lib/format';
 import { colors, layout, motion, spacing } from '@/theme';
-import type { Destination } from '@/types/database';
+import type { DestinationSummary } from '@/types/database';
 
 const CATEGORY_OPTIONS: FilterOption<Category>[] = CATEGORIES.map((category) => ({
   value: category,
@@ -48,7 +48,7 @@ export default function ExploreScreen() {
   const destinations = list.data ?? [];
   const isUpdating = list.status === 'success' && (list.isFetching || filters.query !== debouncedQuery);
 
-  const openDestination = (destination: Destination) =>
+  const openDestination = (destination: DestinationSummary) =>
     router.push({ pathname: '/destination/[id]', params: { id: destination.id } });
 
   return (

@@ -10,4 +10,4 @@ import { createDestinationsRepository } from './destinations';
 export const destinationsRepository = createDestinationsRepository(supabase);
 export const destinationImagesRepository = createDestinationImagesRepository(supabase);
 
-export type { DestinationCounts, DestinationFilters } from './destinations';
+export type { DestinationFilters } from './destinations';

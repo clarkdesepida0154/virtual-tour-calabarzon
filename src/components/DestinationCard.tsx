@@ -8,11 +8,11 @@ import { CategoryTag } from '@/components/Tag';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { formatPlace } from '@/lib/format';
 import { colors, elevation, layout, radius, spacing } from '@/theme';
-import type { Destination } from '@/types/database';
+import type { DestinationSummary } from '@/types/database';
 
 type Props = {
-  destination: Destination;
-  onPress: (destination: Destination) => void;
+  destination: DestinationSummary;
+  onPress: (destination: DestinationSummary) => void;
 };
 
 /** Explore list card: photo, category tag, serif name, and where it is. */
@@ -38,7 +38,7 @@ export function DestinationCard({ destination, onPress }: Props) {
           </View>
         </View>
         <View style={styles.body}>
-          <AppText variant="cardTitle" numberOfLines={2}>
+          <AppText variant="cardTitle" numberOfLines={3}>
             {destination.name}
           </AppText>
           <View style={styles.place}>
@@ -82,7 +82,7 @@ export function FeaturedCard({ destination, onPress }: Props) {
               {CATEGORY_META[destination.category].shortLabel}
             </AppText>
           </View>
-          <AppText variant="cardTitle" color="onPrimary" numberOfLines={2}>
+          <AppText variant="cardTitle" color="onPrimary" numberOfLines={3}>
             {destination.name}
           </AppText>
           <AppText variant="label" color="onPrimaryMuted" numberOfLines={1}>

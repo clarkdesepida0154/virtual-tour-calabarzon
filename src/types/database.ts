@@ -46,6 +46,15 @@ export type DestinationInsert = {
 
 export type DestinationUpdate = Partial<DestinationInsert>;
 
+/**
+ * What lists and cards need. The long texts are left out so that browsing and
+ * searching stay light; load the full `Destination` on the Details screen.
+ */
+export type DestinationSummary = Pick<
+  Destination,
+  'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url'
+>;
+
 // ---------------------------------------------------------------------------
 // destination_images (Phase 2 photo gallery)
 // ---------------------------------------------------------------------------

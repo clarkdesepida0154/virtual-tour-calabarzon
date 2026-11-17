@@ -188,8 +188,10 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
 
       // The old photo is no longer referenced — remove it from storage.
       const previousUrl = destination?.cover_image_url;
-      if (previousUrl && previousUrl !== saved.cover_image_url) {
+      if (destination && previousUrl && previousUrl !== saved.cover_image_url) {
         void destinationImagesRepository.removeByPublicUrl(previousUrl);
+        // ...and drop its row (and credit line) from the destination's photo list.
+        void destinationImagesRepository.removeRecordByUrl(destination.id, previousUrl);
       }
 
       notifyChanged();

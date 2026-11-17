@@ -48,7 +48,7 @@ Screens:
   and province, optional numeric lat/long, photo picker → resize to max 1600px
   → upload to the storage bucket with staged progress → save the public URL.
 
-### Phase 2 — not built (the schema already supports it)
+### Phase 2 — screens not built (the schema and the content are ready)
 
 - **Virtual tour content** — history, cultural significance, photo gallery
   (`destinations.history`, `destinations.cultural_significance`,
@@ -105,29 +105,83 @@ photo scrims). Add new shades there, never inline.
 
 ## Database
 
-`supabase/schema.sql` is the single source of truth. It is re-runnable: it
-starts with a RESET section that drops everything it creates.
+Two files together define everything in the database:
+
+- `supabase/schema.sql` — **structure only**: tables, RLS, the storage bucket.
+  Re-runnable; it starts with a RESET section. It contains no destination data.
+- `data/destinations-seed.json` — **the content**: the 26 destinations, their
+  photos and their quizzes. This is the single source of truth for content.
 
 | Table | Purpose |
 | --- | --- |
 | `destinations` | The catalogue. `id`, `name`, `description`, `address`, `municipality`, `province` (CHECK: the 5 provinces), `category` (CHECK: the 5 categories), `latitude`, `longitude`, `history`, `cultural_significance`, `cover_image_url`, `created_at`, `updated_at` (kept fresh by a trigger). |
-| `destination_images` | Phase 2 gallery: `destination_id` → cascade, `image_url`, `caption`, `sort_order`. |
-| `quiz_questions` | `destination_id` → cascade, `question_text`, `sort_order`. |
-| `quiz_options` | `question_id` → cascade, `option_text`, `is_correct`. |
+| `destination_images` | A destination's photos in order: `destination_id` → cascade, `image_url`, `caption`, `sort_order`. **Row 0 is the cover** (same URL as `destinations.cover_image_url`), rows 1–2 are the gallery. `caption` holds the photo credit. |
+| `quiz_questions` | `destination_id` → cascade, `question_text`, `sort_order` (1–5). |
+| `quiz_options` | `question_id` → cascade, `option_text`, `is_correct`. There is **no order column** — shuffle options in the app when showing a quiz. |
 | `quiz_attempts` | `destination_id` → cascade, `device_id`, `score`, `total`, `taken_at`. |
 | `destination_completions` | `destination_id` → cascade, `device_id`, `completed_at`, unique `(destination_id, device_id)`. |
 
 - **Categories**: Historical Site · Church & Religious · Museum & Art ·
   Natural Wonder · Heritage Town & Culture.
 - **Provinces**: Cavite · Laguna · Batangas · Rizal · Quezon.
-  Both lists also live in `src/constants/taxonomy.ts` — change them together.
+  Both lists also live in `src/constants/taxonomy.ts` and `scripts/lib/dataset.js`
+  — change all three together.
 - **RLS** is on for every table, with permissive `anon` policies for
   select/insert/update/delete plus explicit grants. There is no sign-in; the
   publishable key maps to the `anon` role.
 - **Storage** — public bucket `destination-images` (5 MB limit, JPEG/PNG/WebP),
-  with `anon` read/write policies. Uploaded covers go to `covers/<timestamp>-<random>.jpg`.
-- **Seeds** — 6 sample destinations at the bottom of `schema.sql`, in their own
-  `-- @section seed` block, with placeholder picsum.photos covers.
+  with `anon` read/write policies.
+  - Dataset photos: `<slug>/cover.jpg`, `<slug>/gallery-1.jpg`, `<slug>/gallery-2.jpg`.
+    Their public URLs carry a `?v=<content hash>` so a replaced photo is never
+    served from a stale cache.
+  - Photos picked in the app: `covers/<timestamp>-<random>.jpg`.
+- **Ids are stable.** Seeded rows get deterministic UUIDs derived from the slug
+  (`stableId()` in `scripts/lib/dataset.js`), so re-seeding keeps every id.
+
+## Content dataset
+
+`data/destinations-seed.json` holds, for each of the 26 destinations: `slug`,
+`name`, `category`, `province`, `municipality`, `address`, `latitude`,
+`longitude`, `description` (2–3 sentences), `history` (120–200 words),
+`cultural_significance` (80–150 words), `images` (cover + 2 gallery), `quiz`
+(5 questions × 4 options, exactly one correct), plus `sources`, `caveats`
+and `coordinate_source` recording how it was verified.
+
+The list is fixed — 5 Cavite, 6 Laguna, 5 Batangas, 5 Rizal, 5 Quezon:
+
+- **Cavite**: Aguinaldo Shrine · Corregidor Island · Bonifacio Trial House ·
+  Imus Cathedral · Tagaytay Ridge–Taal Volcano Viewpoint
+- **Laguna**: Rizal Shrine · Pagsanjan Falls · Nagcarlan Underground Cemetery ·
+  Pila Heritage Town · Paete Woodcarving Town & St. James the Apostle Church ·
+  Mount Makiling
+- **Batangas**: Taal Heritage Town & Basilica of St. Martin de Tours ·
+  Taal Volcano & Lake · Apolinario Mabini Shrine · Caleruega Church ·
+  Anilao Diving & Marine Sanctuary
+- **Rizal**: Angono Petroglyphs · Masungi Georeserve · Antipolo Cathedral ·
+  Pinto Art Museum · Daranak Falls
+- **Quezon**: Villa Escudero Plantations · Kamay ni Hesus Shrine ·
+  Malagonlong Bridge · Minor Basilica of St. Michael the Archangel ·
+  Lucban Heritage Town & Pahiyas Festival
+
+Rules for editing content:
+
+- **Accuracy first.** Every date, name and number was checked against Wikipedia
+  plus an official / heritage source where one exists. Contested claims are
+  attributed ("often cited as…") and logged in that entry's `caveats`. Keep it
+  that way: never add an unverified fact, and record what you softened.
+- **Tone**: museum label — neutral, educational, no marketing language.
+- **Quizzes must be answerable from the destination's own text** (description +
+  history + cultural significance). Each question keeps an `evidence` sentence
+  quoted from that text. If you edit a text, re-check its questions.
+- **Photos come from Wikimedia Commons only**, under public domain, CC0, CC BY
+  or CC BY-SA. The credit is stored exactly as
+  `Photo: <author>, <license>, via Wikimedia Commons`. Processed files live in
+  `data/images/<slug>/` (committed, ≤1600px, roughly 150–400 KB) and
+  `data/IMAGE_CREDITS.md` lists every author and licence (generated).
+  Never use an image from any other site.
+- Look at a photo before using it: Commons categories contain miscategorized
+  files (the "Rizal Shrine (Calamba)" search returns Fort Santiago shots).
+- After any change run `npm run data:check`, then `npm run db:seed`.
 
 ### Supabase keys
 
@@ -144,36 +198,55 @@ SUPABASE_DB_URL=…
 ```
 
 Only the `EXPO_PUBLIC_` variables may be read by app code. `SUPABASE_DB_URL`
-is for setup scripts ONLY — never import it anywhere in the app.
+is for setup scripts ONLY — never import it anywhere in the app. It currently
+points at the `aws-0-ap-southeast-1` session pooler (port 5432), which works;
+the direct host is IPv6-only and does not.
 
-### How db-setup works
+### Scripts
 
-`npm run db:setup` → `scripts/db-setup.js` (uses the `pg` package, SSL with
-`rejectUnauthorized: false`):
+| Command | What it does |
+| --- | --- |
+| `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
+| `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
+| `npm run db:verify` | Read-only check: 6 tables with RLS, exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
+| `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete. Cleans up after itself. |
+| `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
+| `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
+| `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
 
-1. Reads `SUPABASE_DB_URL` from `.env` and builds a list of candidates from it:
-   the saved URL, the direct host (`db.<ref>.supabase.co:5432`, IPv6-only), then
-   the session poolers `aws-1-ap-southeast-1` and `aws-0-ap-southeast-1` on
-   5432, then the transaction pooler on 6543. No password is hardcoded in the
-   script.
-2. Uses the first that connects and writes it back to `.env`
-   (**`aws-0-ap-southeast-1` on 5432 is the one that works** for this project).
-3. Splits `schema.sql` on its `-- @section <name>` markers and runs each section
-   as one transaction. A permission error in a storage section is skipped with
-   a note; any other error stops the run.
-4. Verifies: the six tables exist with RLS on and four policies each, the
-   destination rows, and the bucket + its policies.
+How `db:setup` connects: `scripts/lib/db.js` tries `SUPABASE_DB_URL` first and
+only if that fails walks the fallbacks (direct host, then the `aws-1` / `aws-0`
+session poolers, then the transaction pooler), saving the first that works
+back to `.env`. No password is hardcoded.
 
-If all connections fail it stops and asks for the "Session pooler" string from
-the Supabase dashboard's Connect button.
+**There are no placeholder seeds any more.** `db:setup` and `db:seed` are both
+destructive — destinations added from the app and all quiz / progress rows are
+removed — but they always end with the real dataset. No script may regress the
+database to sample data.
 
-- `npm run db:verify` — step 4 only, changes nothing.
-- `npm run db:test` — `scripts/verify-crud.mjs` (run with `tsx`): imports the
-  app's real repositories and form logic and exercises them against the live
-  project with the publishable key. Run it after touching the data layer or
-  the schema.
+### Downloading from Wikimedia Commons — read before fetching photos
 
-**`db:setup` is destructive**: it replaces all destinations with the seeds.
+Commons throttles automated media downloads by public IP, and getting it wrong
+cost hours during Run 2. The rules now built into `scripts/lib/commons.js`:
+
+- **Never request an original upload.** Ask for a rendition at one of the
+  standard widths (1920, 1280, 960 …) that is narrower than the original;
+  `renditionUrl()` does this. Fetching originals is what first triggered the
+  block.
+- **One file at a time, about one every 10 seconds.** 36 photos in a row went
+  through at that pace without a refusal.
+- **Stop at the first HTTP 429.** The answer says `Retry-After: 120`, but a
+  client that asks again after two minutes — or keeps polling — stays blocked.
+  `download()` therefore throws `CommonsThrottledError` and the scripts stop.
+  Leave Commons completely alone for 20+ minutes, then re-run; photos already
+  saved in `data/images` are kept, so it resumes.
+- Only the media host (`upload.wikimedia.org`) is throttled this way; the API
+  on `commons.wikimedia.org` keeps working, so shortlist photos from metadata
+  (title, description, size, licence) and download only the few you will use.
+  Do not build big thumbnail contact sheets.
+- Do not switch to another endpoint or network to get around a block, and do
+  not put personal contact details in the User-Agent. Wait instead.
+- Because `data/images` is committed, seeding never needs Commons at all.
 
 ## Conventions
 
@@ -183,10 +256,26 @@ the Supabase dashboard's Connect button.
   - `src/lib/supabase.ts` — the one client.
   - `src/repositories/destinations.ts`, `destinationImages.ts` — factories that
     take a client, so Node scripts can reuse them. Keep them (and
-    `src/lib/destinationForm.ts`, `base64.ts`, `errors.ts`,
+    `src/lib/destinationForm.ts`, `featured.ts`, `base64.ts`, `errors.ts`,
     `src/constants/taxonomy.ts`) free of React Native imports.
   - `src/repositories/index.ts` — binds the factories to the app client.
     Import repositories from `@/repositories`.
+- **Lists use summaries.** `destinationsRepository.list()` returns
+  `DestinationSummary` rows (id, name, municipality, province, category, cover)
+  — never the long texts. Only `getById()` loads a full `Destination`. Cards
+  take a `DestinationSummary`.
+- **Featured is derived, not stored.** There is no "featured" column.
+  `pickFeatured()` in `src/lib/featured.ts` picks six destinations that cover
+  every province and mix categories, rotating once a day. Do not hardcode
+  destination names or ids anywhere in the app.
+- **Photos have two records.** `destinations.cover_image_url` is what cards and
+  the Details cover show; `destination_images` lists all of a destination's
+  photos (row 0 = the cover) with their credit lines. When a cover is replaced
+  or a destination deleted, the form / Details screen cleans up both the files
+  and the rows — keep that in step if you touch either.
+- **Photo credits are shown** on the Details screen (required by the photo
+  licences). Any new screen that shows a gallery photo large must show its
+  `caption` too.
 - **Handwritten table types** in `src/types/database.ts` (`type` aliases, not
   interfaces — supabase-js needs them assignable to `Record<string, unknown>`).
 - **Reads go through hooks** (`src/hooks/useDestinations.ts`, built on
@@ -212,12 +301,23 @@ src/
   constants/           taxonomy.ts
   context/             The three lightweight contexts
   hooks/               useAsyncData, useDestinations, useDebouncedValue
-  lib/                 supabase, errors, destinationForm, coverPhoto, base64, format
+  lib/                 supabase, errors, destinationForm, featured, coverPhoto, base64, format
   repositories/        Data access
   theme/               Design tokens + Paper and navigation themes
   types/               database.ts
-supabase/schema.sql
-scripts/               db-setup.js, verify-crud.mjs
+data/
+  destinations-seed.json   The content (single source of truth)
+  images/<slug>/           cover.jpg, gallery-1.jpg, gallery-2.jpg (committed)
+  IMAGE_CREDITS.md         Generated list of photo authors and licences
+supabase/schema.sql    Structure only
+scripts/
+  db-setup.js              schema + seed + verify
+  seed-full-dataset.js     the seeder
+  verify-crud.mjs          live data-layer tests (db:test)
+  check-dataset.js         offline dataset validation (data:check)
+  fetch-images.js          download + process photos
+  find-commons-images.js   photo curation helper
+  lib/                     env, db, dataset, images, commons, verify
 assets/                Icons, splash emblem (sources in assets/brand)
 ```
 
@@ -240,14 +340,18 @@ assets/                Icons, splash emblem (sources in assets/brand)
   output (`src/lib/base64.ts`) — no extra native module.
 - Tabs stay mounted. Only the focused screen should render a `<StatusBar>`
   (guard it with `useIsFocused()`).
+- `sharp` is a devDependency used only by the Node scripts. Never import it
+  (or anything under `scripts/`) from `src/`.
 
 ## Rules
 
 - **Stay Expo Go compatible.** No native modules or config plugins that need a
   development build. Before adding a library, confirm it ships in Expo Go.
 - **Never hardcode secrets.** Keys come from `.env`; `.env` is never committed.
-- **Keep seed data replaceable.** Seeds stay in their own section of
-  `schema.sql`; nothing in the app may depend on a specific seed row.
+- **Content lives in `data/destinations-seed.json`.** Nothing in the app may
+  depend on a specific destination; never reintroduce sample / placeholder data
+  into `schema.sql` or any script.
+- **Photos: Wikimedia Commons only**, freely licensed, always credited.
 - Install packages with `npx expo install <package>`.
 - Commit at each milestone with a descriptive message.
 
@@ -267,19 +371,27 @@ Phase 1
 - [x] App icon and splash emblem
 - [x] README with run instructions
 
+Content (Run 2)
+
+- [x] Full dataset: 26 destinations with verified description, history, cultural significance, address and coordinates
+- [ ] Real photos: 78 freely licensed Wikimedia Commons images (cover + 2 gallery each) — chosen and credited in the dataset; 39 of 78 downloaded and processed so far (Commons throttled the rest; run `npm run images:fetch` after a cool-down, then `npm run db:seed`)
+- [x] Quiz bank: 130 questions (5 per destination), each answerable from the destination's own text
+- [x] `db:setup` / `db:seed` load the real dataset; placeholder seeds retired for good
+- [x] Lists load light summaries; Featured picks a varied, daily-rotating set
+- [x] Photo credit shown on the Details screen
+
 Next
 
-- [ ] Full 25-destination dataset + real photos (replace the 6 placeholder seeds)
-- [ ] Virtual Tour mode (history, cultural significance, photo gallery from `destination_images`)
-- [ ] Quiz engine (per-destination multiple choice, auto-scoring)
+- [ ] Virtual Tour mode (history, cultural significance, photo gallery from `destination_images`, with captions)
+- [ ] Quiz engine (per-destination multiple choice, auto-scoring; shuffle the options)
 - [ ] Progress tracking (quiz scores + completed destinations, by device id)
 - [ ] Google Maps (`react-native-maps`) using the stored coordinates
 - [ ] Final polish + EAS APK
 
 ## Not yet verified on a device
 
-Phase 1 was checked with `tsc`, ESLint, an Android Metro bundle, the live
-database script, and a click-through of every flow in the web build. It has
-**not** been run on a physical Android phone by the agent. The parts that only a
-phone can confirm: the photo picker and upload, keyboard avoidance in the form,
-and status-bar / navigation-bar insets.
+The app was checked with `tsc`, ESLint, an Android Metro bundle, the live
+database scripts, and a click-through in the web build. It has **not** been run
+on a physical Android phone by the agent. The parts that only a phone can
+confirm: the photo picker and upload, keyboard avoidance in the form, and
+status-bar / navigation-bar insets.

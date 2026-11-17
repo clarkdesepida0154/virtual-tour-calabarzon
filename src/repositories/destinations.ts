@@ -7,17 +7,24 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { CATEGORIES, PROVINCES } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
 import { AppError, toAppError } from '@/lib/errors';
 import type {
   Database,
   Destination,
   DestinationInsert,
+  DestinationSummary,
   DestinationUpdate,
 } from '@/types/database';
 
 const TABLE = 'destinations';
+
+/**
+ * Columns for lists and cards. The long texts (description, history, cultural
+ * significance) are left out on purpose: a list of 26 destinations would
+ * otherwise download every essay on each search keystroke.
+ */
+const SUMMARY_COLUMNS = 'id, name, municipality, province, category, cover_image_url';
 
 /** Postgres "invalid text representation" — e.g. an id that is not a UUID. */
 const INVALID_INPUT_SYNTAX = '22P02';
@@ -27,12 +34,6 @@ export type DestinationFilters = {
   search?: string;
   category?: Category | null;
   province?: Province | null;
-};
-
-export type DestinationCounts = {
-  total: number;
-  byCategory: Record<Category, number>;
-  byProvince: Record<Province, number>;
 };
 
 /**
@@ -52,18 +53,13 @@ export function buildSearchFilter(term: string): string | null {
   return `name.ilike.${quoted},municipality.ilike.${quoted}`;
 }
 
-function emptyCounts(): DestinationCounts {
-  return {
-    total: 0,
-    byCategory: Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>,
-    byProvince: Object.fromEntries(PROVINCES.map((p) => [p, 0])) as Record<Province, number>,
-  };
-}
-
 export function createDestinationsRepository(client: SupabaseClient<Database>) {
-  /** All destinations matching the filters, A–Z. Filters combine with AND. */
-  async function list(filters: DestinationFilters = {}): Promise<Destination[]> {
-    let query = client.from(TABLE).select('*');
+  /**
+   * Destinations matching the filters, A–Z, as lightweight summaries.
+   * Filters combine with AND; with no filters this is the whole collection.
+   */
+  async function list(filters: DestinationFilters = {}): Promise<DestinationSummary[]> {
+    let query = client.from(TABLE).select(SUMMARY_COLUMNS);
 
     if (filters.category) query = query.eq('category', filters.category);
     if (filters.province) query = query.eq('province', filters.province);
@@ -76,19 +72,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     return data;
   }
 
-  /** The newest destinations, for the Home carousel. */
-  async function listFeatured(limit = 6): Promise<Destination[]> {
-    const { data, error } = await client
-      .from(TABLE)
-      .select('*')
-      .order('created_at', { ascending: false })
-      .order('name', { ascending: true })
-      .limit(limit);
-    if (error) throw toAppError(error, 'We couldn’t load the featured destinations.');
-    return data;
-  }
-
-  /** One destination, or `null` when it does not exist (or was deleted). */
+  /** One full destination, or `null` when it does not exist (or was deleted). */
   async function getById(id: string): Promise<Destination | null> {
     const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
     if (error) {
@@ -118,26 +102,13 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     return data;
   }
 
+  /** Deletes the destination; its photos, quiz and progress rows cascade. */
   async function remove(id: string): Promise<void> {
     const { error } = await client.from(TABLE).delete().eq('id', id);
     if (error) throw toAppError(error, 'We couldn’t delete the destination.');
   }
 
-  /** How many destinations each category and province has (for Home). */
-  async function counts(): Promise<DestinationCounts> {
-    const { data, error } = await client.from(TABLE).select('category, province');
-    if (error) throw toAppError(error, 'We couldn’t load the destination counts.');
-
-    const result = emptyCounts();
-    for (const row of data) {
-      result.total += 1;
-      if (row.category in result.byCategory) result.byCategory[row.category] += 1;
-      if (row.province in result.byProvince) result.byProvince[row.province] += 1;
-    }
-    return result;
-  }
-
-  return { list, listFeatured, getById, create, update, remove, counts };
+  return { list, getById, create, update, remove };
 }
 
 export type DestinationsRepository = ReturnType<typeof createDestinationsRepository>;

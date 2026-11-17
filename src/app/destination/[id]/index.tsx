@@ -18,7 +18,7 @@ import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag, ProvinceTag } from '@/components/Tag';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useToast } from '@/context/ToastContext';
-import { useDestination } from '@/hooks/useDestinations';
+import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
@@ -39,6 +39,8 @@ export default function DestinationDetailsScreen() {
   const { notifyChanged } = useDataSync();
   const { showToast } = useToast();
   const query = useDestination(id);
+  // The photo rows carry each picture's credit line (author and licence).
+  const images = useDestinationImages(id);
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,8 +84,11 @@ export default function DestinationDetailsScreen() {
     setIsDeleting(true);
     try {
       await destinationsRepository.remove(destination.id);
-      // Best-effort: also remove its uploaded photo from storage.
-      void destinationImagesRepository.removeByPublicUrl(destination.cover_image_url);
+      // Best-effort: also remove its photos (cover and gallery) from storage.
+      void destinationImagesRepository.removeFilesByPublicUrl([
+        destination.cover_image_url,
+        ...(images.data ?? []).map((image) => image.image_url),
+      ]);
       setDeletedCopy(destination);
       setConfirmVisible(false);
       notifyChanged();
@@ -124,6 +129,11 @@ export default function DestinationDetailsScreen() {
   }
 
   const coordinates = destination ? formatCoordinates(destination) : null;
+  // Freely licensed photos must be credited; show the cover's credit if we have one.
+  const coverCredit =
+    (destination &&
+      images.data?.find((image) => image.image_url === destination.cover_image_url)?.caption) ||
+    null;
   const actionBarSpace = layout.actionBarHeight + insets.bottom;
 
   return (
@@ -205,6 +215,15 @@ export default function DestinationDetailsScreen() {
                   title="Cultural Significance"
                   body={destination.cultural_significance}
                 />
+              ) : null}
+
+              {coverCredit ? (
+                <View style={styles.credit}>
+                  <AppIcon name="camera-outline" size="xs" color="muted" />
+                  <AppText variant="caption" color="muted" style={styles.flex}>
+                    {coverCredit}
+                  </AppText>
+                </View>
               ) : null}
             </>
           ) : (
@@ -370,6 +389,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     ...elevation.card,
+  },
+  credit: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
   storyHeader: {
     flexDirection: 'row',

@@ -41,6 +41,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
     "pg": "^8.23.1",
+    "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
@@ -53,7 +54,11 @@
     "lint": "expo lint",
     "db:setup": "node scripts/db-setup.js",
     "db:verify": "node scripts/db-setup.js --verify-only",
-    "db:test": "tsx scripts/verify-crud.mjs"
+    "db:test": "tsx scripts/verify-crud.mjs",
+    "db:seed": "node scripts/seed-full-dataset.js",
+    "data:check": "node scripts/check-dataset.js",
+    "images:fetch": "node scripts/fetch-images.js",
+    "images:find": "node scripts/find-commons-images.js"
   },
   "private": true
 }

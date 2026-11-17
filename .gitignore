@@ -43,3 +43,6 @@ example
 # generated native folders
 /ios
 /android
+
+# image curation scratch (contact sheets, candidate lists)
+.cache/
