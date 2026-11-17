@@ -295,7 +295,9 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
     setIndex(clamped);
   };
 
-  const photoHeight = Math.min(height * 0.56, width * 1.1);
+  // The photo fills whatever height is left between the heading and the
+  // caption block; the pages need that height as a number.
+  const [frameHeight, setFrameHeight] = useState(Math.round(height * 0.5));
 
   return (
     <View style={[styles.flex, { paddingTop: topInset + layout.topBarHeight }]}>
@@ -308,7 +310,7 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
         </AppText>
       </View>
 
-      <View style={{ height: photoHeight }}>
+      <View style={styles.flex} onLayout={(event) => setFrameHeight(event.nativeEvent.layout.height)}>
         <FlatList
           ref={(instance) => {
             listRef.current = instance;
@@ -322,7 +324,7 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
           scrollEventThrottle={16}
           getItemLayout={(_, itemIndex) => ({ length: width, offset: width * itemIndex, index: itemIndex })}
           renderItem={({ item, index: itemIndex }) => (
-            <View style={{ width, height: photoHeight }}>
+            <View style={{ width, height: frameHeight }}>
               <CoverImage
                 uri={item.uri}
                 label={`Photo ${itemIndex + 1} of ${plates.length}`}
@@ -363,7 +365,7 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
         ) : null}
       </View>
 
-      <View style={[styles.plateFooter, { paddingBottom: insets.bottom + layout.actionBarHeight }]}>
+      <View style={[styles.plateFooter, { paddingBottom: insets.bottom + layout.actionBarHeight + spacing.lg }]}>
         <PageDots count={plates.length} index={index} />
         <AppText variant="label" color="onExhibitSoft">
           Plate {index + 1} of {plates.length} · swipe to browse
@@ -726,10 +728,9 @@ const styles = StyleSheet.create({
     right: spacing.xs,
   },
   plateFooter: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.md,
+    paddingTop: spacing.xl,
     paddingHorizontal: spacing.xl,
   },
   credit: {

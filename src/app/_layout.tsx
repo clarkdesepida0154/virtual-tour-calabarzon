@@ -76,11 +76,12 @@ function RootNavigator() {
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
       }}>
-      <Stack.Protected guard={needsWelcome}>
+      <Stack.Protected guard={needsWelcome} redirectTo="/">
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
       </Stack.Protected>
 
-      <Stack.Protected guard={!needsWelcome}>
+      {/* Without a session or a guest choice, every app screen redirects to Welcome. */}
+      <Stack.Protected guard={!needsWelcome} redirectTo="/welcome">
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="destination/[id]/index" />
         <Stack.Screen name="destination/[id]/edit" />

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Unit tests for the quiz engine and the other pure modules behind Phase 2.
  *

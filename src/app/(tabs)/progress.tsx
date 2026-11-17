@@ -202,7 +202,7 @@ function ProgressBody({
       </View>
 
       {/* Provinces */}
-      <SectionHeader title="By province" subtitle="Visited destinations in each of the five provinces" />
+      <SectionHeader inset={false} title="By province" subtitle="Visited destinations in each of the five provinces" />
       <View style={styles.card}>
         {summary.provinces.map((row, index) => (
           <View key={row.province} style={[styles.provinceRow, index > 0 && styles.divider]}>
@@ -227,7 +227,7 @@ function ProgressBody({
       </View>
 
       {/* Journey */}
-      <SectionHeader title="Your journey" subtitle="Places you have toured or been quizzed on" />
+      <SectionHeader inset={false} title="Your journey" subtitle="Places you have toured or been quizzed on" />
       {summary.journey.length === 0 ? (
         <View style={styles.card}>
           <EmptyState

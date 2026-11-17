@@ -39,31 +39,79 @@ Screens:
   shortcuts (tap → pre-filtered Explore).
 - **Explore** — search-as-you-type (`ilike` on name and municipality),
   combinable single-select chips for category + province, destination cards
-  (cover, name, municipality • province, category tag), pull-to-refresh.
-- **Details** — full-width cover, name, address row, category + province tags,
-  description; History and Cultural Significance sections render only when
-  those fields have content; Edit, and Delete with a confirmation dialog.
+  (cover, name, municipality • province, category tag), pull-to-refresh, and
+  an **Add** floating action button (bottom right) that opens the Add form.
+- **Details** — full-width cover, name, category + province tags, Visited and
+  best-quiz-score badges (when earned), address row, description, a dark
+  "Virtual tour" invitation card, a small map preview card (tap → Map tab
+  centred there), History and Cultural Significance sections (only when they
+  have content), the cover's photo credit, and a "Manage this entry" section
+  with Edit and Delete (confirmation dialog). The bottom bar holds **Start
+  Virtual Tour** (primary) and **Quiz** (shows the best score once taken).
 - **Add / Edit** — one shared form (`DestinationForm`): validation (name,
   description, address, province, category required), dropdowns for category
   and province, optional numeric lat/long, photo picker → resize to max 1600px
   → upload to the storage bucket with staged progress → save the public URL.
+  Add is a root-stack screen (`src/app/add.tsx`) since Run 3.
 
-### Phase 2 — screens not built (the schema and the content are ready)
+### Phase 2 — built (Run 3)
 
-- **Virtual tour content** — history, cultural significance, photo gallery
-  (`destinations.history`, `destinations.cultural_significance`,
-  `destination_images`).
-- **Per-destination multiple-choice quizzes** with auto-scoring
-  (`quiz_questions`, `quiz_options`).
-- **Progress tracking** — quiz scores and completed destinations, keyed by an
-  anonymous device id (`quiz_attempts`, `destination_completions`).
+1. **Virtual Tour** (`destination/[id]/tour`) — full-screen, tab bar hidden,
+   close button, step indicator. Guided sequence: **Intro** (cover photo,
+   name, category, municipality • province, description, credit) →
+   **Gallery** (all `destination_images` rows, swipeable, page dots, arrow
+   buttons, credit line from each row's `caption`) → **History** (Chapter I)
+   → **Cultural Significance** (Chapter II) → **Completion** ("Mark as
+   Visited" writes `destination_completions`, idempotent per user key; then
+   "Take the Quiz"). Intro and gallery sit on a dark "gallery wall"
+   (`colors.exhibit`), chapters on cream paper with a gold-ruled lead
+   sentence. Steps with no content are skipped. Android back steps back.
+2. **Quiz** (`destination/[id]/quiz`) — intro card (5 questions, best score,
+   retakes allowed) → one question at a time, 4 option cards **shuffled for
+   every attempt** (`prepareQuiz()`), instant feedback (correct = forest green,
+   chosen-wrong = terracotta, options lock) → score screen (ring with X/5 and
+   %, celebratory at 4+/5, encouraging below), Retake / Back. Every attempt is
+   saved to `quiz_attempts`; the best is derived (`bestAttempt()`).
+3. **Progress tab** — identity card (email + Sign out, or Guest + "Create an
+   account" nudge), N/26 ring, quizzes taken, average and best score,
+   per-province bars, and a "Your journey" list (visited badge + best score,
+   tap → Details) with a friendly empty state.
+4. **Auth** — Supabase email + password. Welcome screen on launch without a
+   session (Create an account / Sign in / Continue as guest). Guests have
+   every feature. A guest who signs up keeps their progress (rows are moved
+   to the new account). Sign out returns to Welcome.
+5. **Map tab** (`react-native-maps`) — 26 pins coloured by category, legend
+   chip row that doubles as a category filter, "show the whole region"
+   button, native callout (name + category → Details) plus a preview card.
+
+### Identity model ("user key")
+
+No schema change: the text column `device_id` on `quiz_attempts` and
+`destination_completions` holds a generic **user key**:
+
+- signed in → the Supabase auth user id;
+- guest → a device UUID generated once (`expo-crypto`) and kept in
+  AsyncStorage (`src/lib/localPrefs.ts`).
+
+`IdentityContext` (`useIdentity()`) exposes `userKey`, `kind`
+(`user`/`guest`), `email`, `label` ("Guest" or the email), `needsWelcome` and
+the auth actions. Progress hooks include the user key in their cache key, so
+they reload by themselves on sign-in / sign-out. The "Continue as guest"
+choice is remembered, so guests are not shown Welcome on every launch.
 
 ## Fixed stack — do not substitute
 
 - Latest Expo SDK (currently **58**; React Native 0.88, React 19.3) +
   **TypeScript strict**, scaffolded with create-expo-app.
-- **Expo Router** — bottom tabs (Home / Explore / Add) inside a root stack that
-  also holds Details and Edit. Typed routes and the React Compiler are on.
+- **Expo Router** — bottom tabs (Home / Explore / Map / Progress) inside a
+  root stack that also holds Welcome, Sign In, Sign Up, Add, Details, Edit,
+  Tour and Quiz. The stack uses `Stack.Protected` with `redirectTo`: without
+  a session or a guest choice only Welcome (+ Sign In / Sign Up) is
+  reachable. Typed routes and the React Compiler are on.
+- **@react-native-async-storage/async-storage** (session + device id),
+  **react-native-maps** (Map tab), **react-native-svg** (progress ring),
+  **expo-crypto** (device UUID), **react-native-reanimated** (step
+  transitions) — all included in Expo Go.
 - **react-native-paper** (Material Design 3) with the custom theme below.
 - **@supabase/supabase-js** for all data.
 - **expo-image** for all image rendering; **expo-image-picker** +
@@ -118,19 +166,28 @@ Two files together define everything in the database:
 | `destination_images` | A destination's photos in order: `destination_id` → cascade, `image_url`, `caption`, `sort_order`. **Row 0 is the cover** (same URL as `destinations.cover_image_url`), rows 1–2 are the gallery. `caption` holds the photo credit. |
 | `quiz_questions` | `destination_id` → cascade, `question_text`, `sort_order` (1–5). |
 | `quiz_options` | `question_id` → cascade, `option_text`, `is_correct`. There is **no order column** — shuffle options in the app when showing a quiz. |
-| `quiz_attempts` | `destination_id` → cascade, `device_id`, `score`, `total`, `taken_at`. |
-| `destination_completions` | `destination_id` → cascade, `device_id`, `completed_at`, unique `(destination_id, device_id)`. |
+| `quiz_attempts` | `destination_id` → cascade, `device_id` (the user key), `score`, `total`, `taken_at`. One row per finished attempt. |
+| `destination_completions` | `destination_id` → cascade, `device_id` (the user key), `completed_at`, unique `(destination_id, device_id)` — so "Mark as Visited" is idempotent per user. |
 
 - **Categories**: Historical Site · Church & Religious · Museum & Art ·
   Natural Wonder · Heritage Town & Culture.
 - **Provinces**: Cavite · Laguna · Batangas · Rizal · Quezon.
   Both lists also live in `src/constants/taxonomy.ts` and `scripts/lib/dataset.js`
   — change all three together.
-- **RLS** is on for every table, with permissive `anon` policies for
-  select/insert/update/delete plus explicit grants. There is no sign-in; the
-  publishable key maps to the `anon` role.
+- **RLS** is on for every table, with permissive policies for
+  select/insert/update/delete plus explicit grants, **for both `anon`
+  (guests) and `authenticated` (signed-in users)**. Run 3 had to add
+  `authenticated`: with `anon`-only policies a signed-in user read zero
+  destinations. Policy names keep their `_anon_` suffix because
+  `scripts/lib/verify.js` looks them up by name.
+- **Production note** — this is deliberately open for a school project. A
+  real deployment would scope progress rows per user with `auth.uid()`
+  policies, e.g. `using (device_id = auth.uid()::text) with check
+  (device_id = auth.uid()::text)` for `authenticated`, give guests Supabase
+  anonymous sign-in (or a signed token) instead of a client-chosen key, and
+  restrict catalogue writes to editors.
 - **Storage** — public bucket `destination-images` (5 MB limit, JPEG/PNG/WebP),
-  with `anon` read/write policies.
+  with read/write policies for `anon` and `authenticated`.
   - Dataset photos: `<slug>/cover.jpg`, `<slug>/gallery-1.jpg`, `<slug>/gallery-2.jpg`.
     Their public URLs carry a `?v=<content hash>` so a replaced photo is never
     served from a stale cache.
@@ -195,12 +252,46 @@ The secret key is never used anywhere.
 EXPO_PUBLIC_SUPABASE_URL=…
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=…
 SUPABASE_DB_URL=…
+GOOGLE_MAPS_ANDROID_API_KEY=        # blank for now — see "Google Maps" below
 ```
 
 Only the `EXPO_PUBLIC_` variables may be read by app code. `SUPABASE_DB_URL`
 is for setup scripts ONLY — never import it anywhere in the app. It currently
 points at the `aws-0-ap-southeast-1` session pooler (port 5432), which works;
 the direct host is IPv6-only and does not.
+
+### Auth (Supabase email + password)
+
+- supabase-js built-in auth; the session is persisted in AsyncStorage and
+  refreshed only while the app is in the foreground (`src/lib/supabase.ts`).
+  All calls go through `src/repositories/auth.ts`; friendly messages come from
+  `friendlyAuthMessage()` in `src/lib/authForm.ts`.
+- **Status at the end of Run 3: "Confirm email" is still ON** in the Supabase
+  dashboard (`/auth/v1/settings` reports `mailer_autoconfirm: false`). So a
+  real sign-up returns no session and the app shows "Check your inbox".
+  Worse, the project uses Supabase's built-in mailer, which only allows a
+  few emails per hour (Run 3's tests hit `over_email_send_rate_limit`) — so
+  sign-ups will fail for most people until the owner turns the toggle OFF:
+  **Dashboard → Authentication → Sign In / Providers → Email → "Confirm
+  email" → off**. Then sign-up signs straight in and sends no email.
+- `npm run auth:test` re-checks all of this live, and tests sign-in, RLS for
+  the `authenticated` role and progress writes with a throwaway user that it
+  creates directly in `auth.users` (via `SUPABASE_DB_URL`) and deletes again.
+
+### Google Maps
+
+- `react-native-maps` renders Google Maps on Android **in Expo Go with no API
+  key of ours** (Expo Go ships its own). The web build cannot show native
+  maps, so `DestinationMap.web.tsx` / `MapPreview.web.tsx` are schematic
+  stand-ins with the same props.
+- `app.config.js` adds the `react-native-maps` config plugin with
+  `androidGoogleMapsApiKey` read from `GOOGLE_MAPS_ANDROID_API_KEY` in `.env`.
+  **That key is needed only for the standalone APK in Run 4** (create it in
+  Google Cloud with "Maps SDK for Android", restrict it to the package name
+  + SHA-1). Config plugins only run in native builds, so Expo Go ignores it.
+- The base map is styled warm and quiet (`mapStyle` in the theme). Pins use
+  `pinColor`, which Google tints by hue only — hence category colours on
+  clearly different hues (`colors.category*`).
 
 ### Scripts
 
@@ -209,7 +300,10 @@ the direct host is IPv6-only and does not.
 | `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
 | `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
 | `npm run db:verify` | Read-only check: 6 tables with RLS, exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
-| `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete. Cleans up after itself. |
+| `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Cleans up after itself. |
+| `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
+| `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59 checks. Cleans up its rows and test user. |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
 | `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
 | `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
@@ -241,10 +335,14 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
   before a task is done.
 - **Repository pattern.** Screens and components never call supabase-js.
   - `src/lib/supabase.ts` — the one client.
-  - `src/repositories/destinations.ts`, `destinationImages.ts` — factories that
-    take a client, so Node scripts can reuse them. Keep them (and
-    `src/lib/destinationForm.ts`, `featured.ts`, `base64.ts`, `errors.ts`,
-    `src/constants/taxonomy.ts`) free of React Native imports.
+  - `src/repositories/destinations.ts`, `destinationImages.ts`, `quiz.ts`,
+    `progress.ts`, `auth.ts` — factories that take a client, so Node scripts
+    can reuse them. Keep them (and `src/lib/destinationForm.ts`, `featured.ts`,
+    `base64.ts`, `errors.ts`, `quiz.ts`, `progress.ts`, `authForm.ts`,
+    `mapRegion.ts`, `format.ts`, `src/constants/taxonomy.ts`) free of React
+    Native imports — the unit tests and live scripts load them in Node.
+  - **Progress is always keyed by `useIdentity().userKey`**; never read or
+    write progress rows with any other id.
   - `src/repositories/index.ts` — binds the factories to the app client.
     Import repositories from `@/repositories`.
 - **Lists use summaries.** `destinationsRepository.list()` returns
@@ -273,7 +371,8 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
 - **Errors** are wrapped in `AppError` (`src/lib/errors.ts`) with a
   plain-language message; show them with `<ErrorState>` or a toast.
 - **State** — `ExploreFiltersContext` (search + filters, shared by Home and
-  Explore), `DataSyncContext`, `ToastContext`. Nothing heavier.
+  Explore), `DataSyncContext`, `ToastContext`, `IdentityContext` (session,
+  user key, auth actions). Nothing heavier.
 - **Imports** use the `@/` alias for `src/`.
 
 Folder layout:
@@ -281,17 +380,22 @@ Folder layout:
 ```
 src/
   app/                 Expo Router routes only
-    _layout.tsx        Fonts, providers, root stack
-    (tabs)/            _layout (tab bar), index (Home), explore, add
-    destination/[id]/  index (Details), edit
-  components/          Shared UI; components/form/ holds the form pieces
+    _layout.tsx        Fonts, providers, root stack (Protected groups)
+    welcome, sign-in, sign-up, add
+    (tabs)/            _layout (tab bar), index (Home), explore, map, progress
+    destination/[id]/  index (Details), edit, tour, quiz
+  components/          Shared UI; form/ (the form), auth/ (auth fields),
+                       map/ (native + .web map, preview, legend)
   constants/           taxonomy.ts
-  context/             The three lightweight contexts
-  hooks/               useAsyncData, useDestinations, useDebouncedValue
-  lib/                 supabase, errors, destinationForm, featured, coverPhoto, base64, format
-  repositories/        Data access
-  theme/               Design tokens + Paper and navigation themes
+  context/             DataSync, ExploreFilters, Toast, Identity
+  hooks/               useAsyncData, useDestinations, useProgress, useDebouncedValue
+  lib/                 supabase, errors, destinationForm, featured, coverPhoto, base64,
+                       format, quiz, progress, authForm, mapRegion, localPrefs
+  repositories/        Data access (destinations, destinationImages, quiz, progress, auth)
+  theme/               Design tokens + Paper, navigation and Google Maps themes
   types/               database.ts
+tests/                 Unit tests (npm test)
+app.config.js          Adds the react-native-maps plugin + key from .env
 data/
   destinations-seed.json   The content (single source of truth)
   images/<slug>/           cover.jpg, gallery-1.jpg, gallery-2.jpg (committed)
@@ -301,6 +405,8 @@ scripts/
   db-setup.js              schema + seed + verify
   seed-full-dataset.js     the seeder
   verify-crud.mjs          live data-layer tests (db:test)
+  verify-auth.mjs          live auth tests (auth:test)
+  web-clickthrough.mjs     headless click-through of the web build
   check-dataset.js         offline dataset validation (data:check)
   fetch-images.js          download + process photos
   find-commons-images.js   photo curation helper
@@ -317,6 +423,27 @@ assets/                Icons, splash emblem (sources in assets/brand)
   `ThemeProvider` come from `expo-router`.
 - The React Compiler lint rules reject reading or passing refs during render.
   Register refs through a callback prop (see `FieldAnchor` in `DestinationForm`).
+- The lint rule `react-hooks/set-state-in-effect` rejects `setState` at the top
+  of an effect. To react to a changed route param, adjust state during render
+  with a "handled" marker (see the `?focus=` handling in `(tabs)/map.tsx`); to
+  read fresh props inside an effect without re-running it, use
+  `useEffectEvent` (see `DestinationMap.tsx`).
+- `Stack.Protected` without `redirectTo` sends a blocked user to the first
+  *unguarded* screen (here it was Sign In, not Welcome). Always pass
+  `redirectTo`.
+- After sign-in, navigate in an effect that waits for `identity.kind` to
+  change — navigating right after `await signIn()` races the guard re-render.
+- react-native-maps 1.29: the prop is `showsPointsOfInterests` (plural); call
+  camera methods only after `onMapReady` (Android ignores earlier ones).
+- Platform files: `Foo.web.tsx` next to `Foo.tsx` keeps a native-only library
+  (react-native-maps) out of the web bundle. Keep their props in a shared
+  `types.ts`.
+- Hidden stack screens stay mounted on web, so Playwright locators need
+  `.filter({ visible: true })`; RN `accessibilityRole="header"` is
+  `role="heading"` on web; Paper `TextInput` labels are not ARIA labels.
+- Supabase rejects `@example.com` sign-ups (`email_address_invalid`) and the
+  built-in mailer rate-limits sign-ups quickly — test sign-in with a
+  DB-created confirmed user instead (as `verify-auth.mjs` does).
 - Paper's `ProgressBar` stretches to 100% height on web — always use
   `<LinearProgress>`, which boxes it.
 - A Paper `TextInput.Icon` is a button; do not put one inside a `Pressable`.
@@ -334,6 +461,8 @@ assets/                Icons, splash emblem (sources in assets/brand)
 
 - **Stay Expo Go compatible.** No native modules or config plugins that need a
   development build. Before adding a library, confirm it ships in Expo Go.
+  (The `react-native-maps` plugin entry in `app.config.js` is fine: it only
+  matters for a native build and Expo Go ignores it.)
 - **Never hardcode secrets.** Keys come from `.env`; `.env` is never committed.
 - **Content lives in `data/destinations-seed.json`.** Nothing in the app may
   depend on a specific destination; never reintroduce sample / placeholder data
@@ -367,18 +496,39 @@ Content (Run 2)
 - [x] Lists load light summaries; Featured picks a varied, daily-rotating set
 - [x] Photo credit shown on the Details screen
 
-Next
+Phase 2 (Run 3)
 
-- [ ] Virtual Tour mode (history, cultural significance, photo gallery from `destination_images`, with captions)
-- [ ] Quiz engine (per-destination multiple choice, auto-scoring; shuffle the options)
-- [ ] Progress tracking (quiz scores + completed destinations, by device id)
-- [ ] Google Maps (`react-native-maps`) using the stored coordinates
-- [ ] Final polish + EAS APK
+- [x] Virtual Tour mode: intro → gallery (credited, swipeable) → History → Cultural Significance → completion with Mark as Visited → quiz
+- [x] Quiz engine: shuffled options per attempt, instant feedback, score screen, every attempt saved, best score on Details
+- [x] Progress tab: identity, N/26 ring, quiz stats, per-province bars, journey list, empty state
+- [x] Supabase email + password auth, Welcome screen, Continue as guest, guest progress carried into a new account
+- [x] Identity model: one "user key" (auth user id or device UUID) in `device_id`
+- [x] RLS + grants extended to the `authenticated` role
+- [x] Google Maps tab (`react-native-maps`): category pins, legend filter, callouts → Details; Details map preview → Map tab
+- [x] Navigation: tabs Home / Explore / Map / Progress; Add is a FAB on Explore
+- [x] Unit tests (`npm test`), live progress checks (`db:test`), live auth checks (`auth:test`), web click-through script
+
+Next (Run 4)
+
+- [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (see Auth above)
+- [ ] Top up the 3 photo sets flagged in Run 2
+- [ ] Polish pass on a real phone (insets, map pin legibility, transitions)
+- [ ] EAS APK with `GOOGLE_MAPS_ANDROID_API_KEY`
+- [ ] Portfolio README (screenshots, architecture, decisions)
 
 ## Not yet verified on a device
 
-The app was checked with `tsc`, ESLint, an Android Metro bundle, the live
-database scripts, and a click-through in the web build. It has **not** been run
-on a physical Android phone by the agent. The parts that only a phone can
-confirm: the photo picker and upload, keyboard avoidance in the form, and
-status-bar / navigation-bar insets.
+The app was checked with `tsc`, ESLint, the unit tests, an Android export
+(Hermes bundle), the live database and auth scripts, and a 59-step headless
+click-through of the web build. It has **not** been run on a physical Android
+phone by the agent. The parts that only a phone can confirm:
+
+- the photo picker and upload, keyboard avoidance in the forms (Add / Edit,
+  Sign In / Sign Up), status-bar / navigation-bar insets;
+- **native Google Maps** (web uses a schematic stand-in): pins and their hue
+  colours, callout tap → Details, camera fly-to from Details, the `liteMode`
+  preview on Details;
+- swipe gestures in the tour gallery (web was driven with the arrow buttons),
+  Reanimated step transitions, the Android back button stepping back through
+  the tour and asking before leaving a quiz;
+- session restore after killing the app (web reload was verified).

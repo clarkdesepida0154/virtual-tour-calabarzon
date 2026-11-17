@@ -9,12 +9,14 @@ type Props = {
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Adds the page gutter. Turn off when the header sits in an already padded column. */
+  inset?: boolean;
 };
 
 /** Serif section title with a short gold rule, and an optional "See all". */
-export function SectionHeader({ title, subtitle, actionLabel, onAction }: Props) {
+export function SectionHeader({ title, subtitle, actionLabel, onAction, inset = true }: Props) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !inset && styles.flush]}>
       <View style={styles.text}>
         <View style={styles.ornament} />
         <AppText variant="sectionTitle" accessibilityRole="header">
@@ -50,6 +52,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.lg,
     paddingHorizontal: spacing.xl,
+  },
+  flush: {
+    paddingHorizontal: spacing.xs,
   },
   text: {
     flex: 1,
