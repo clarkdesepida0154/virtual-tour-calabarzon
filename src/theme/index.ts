@@ -93,6 +93,8 @@ export const iconSize = {
   lg: 28,
   xl: 40,
   xxl: 56,
+  /** Decorative watermark in the Home hero. */
+  watermark: 176,
 } as const;
 
 export type IconSizeToken = keyof typeof iconSize;
@@ -102,6 +104,7 @@ export const layout = {
   touchTarget: 48,
   hairline: 1,
   chipHeight: 38,
+  searchBarHeight: 56,
   tabBarHeight: 64,
   topBarHeight: 56,
   actionBarHeight: 72,
@@ -118,6 +121,17 @@ export const layout = {
   iconBadge: 44,
   /** Space kept clear at the bottom of scroll views for the snackbar. */
   snackbarOffset: 80,
+  progressBarHeight: 4,
+  /** Gap Paper leaves above an outlined input for its floating label. */
+  outlinedInputLabelInset: 6,
+  textAreaMinHeight: 128,
+  /** Height of the dark fade behind the status bar on the Details cover. */
+  coverFadeHeight: 128,
+  /** Width of content on very wide screens (tablets, web preview). */
+  maxContentWidth: 640,
+  /** Dialogs never grow taller than this share of the screen. */
+  dialogMaxHeightRatio: 0.6,
+  pressedOpacity: 0.86,
 } as const;
 
 export const motion = {
@@ -176,6 +190,11 @@ export const typography = {
     textTransform: 'uppercase',
   },
   tabLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 16 },
+  button: { fontFamily: fonts.bodySemiBold, fontSize: 15, lineHeight: 20 },
+  /** Text inputs: no lineHeight, so the caret stays vertically centred. */
+  input: { fontFamily: fonts.body, fontSize: 16 },
+  /** Serif initial inside the round province badge. */
+  monogram: { fontFamily: fonts.display, fontSize: 20, lineHeight: 26 },
 } satisfies Record<string, TextStyle>;
 
 export type TypographyToken = keyof typeof typography;

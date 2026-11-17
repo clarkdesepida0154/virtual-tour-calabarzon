@@ -65,11 +65,11 @@ type ProvinceMeta = {
 };
 
 export const PROVINCE_META: Record<Province, ProvinceMeta> = {
-  Cavite: { tagline: 'Cradle of the Philippine Revolution' },
+  Cavite: { tagline: 'Cradle of the Revolution' },
   Laguna: { tagline: 'Birthplace of José Rizal' },
-  Batangas: { tagline: 'Taal Volcano and its heritage towns' },
-  Rizal: { tagline: 'Home of Angono, the art capital' },
-  Quezon: { tagline: 'Coconut country and colourful fiestas' },
+  Batangas: { tagline: 'Taal Lake and heritage towns' },
+  Rizal: { tagline: 'Cradle of Philippine art' },
+  Quezon: { tagline: 'Land of coconuts and fiestas' },
 };
 
 export function isProvince(value: unknown): value is Province {

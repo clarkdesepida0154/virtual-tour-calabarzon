@@ -35,10 +35,10 @@ export const FIELD_LIMITS = {
 export const FORM_FIELD_ORDER: readonly DestinationFormField[] = [
   'name',
   'category',
+  'description',
   'province',
   'municipality',
   'address',
-  'description',
   'latitude',
   'longitude',
   'history',

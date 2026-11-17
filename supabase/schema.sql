@@ -230,6 +230,10 @@ create policy "destination_images_anon_delete"
 -- Six sample destinations with placeholder cover photos. This whole section is
 -- self-contained: replace it with the full 25-destination dataset later
 -- without touching anything above.
+--
+-- The picsum.photos seeds are stand-ins, NOT photos of the real places. Each
+-- seed was checked by eye to be a neutral landscape/building; real photos
+-- replace them together with the full dataset.
 -- -----------------------------------------------------------------------------
 insert into public.destinations
   (name, description, address, municipality, province, category,
@@ -257,7 +261,7 @@ values
     13.8802, 120.9235,
     'Augustinian missionaries founded the parish in the 1570s near the shore of Taal Lake, but the old town was destroyed by the 1754 eruption of Taal Volcano and moved to its present site. Construction of the current church began in 1856 under Spanish architect Luciano Oliver, and it was declared a minor basilica in 1954.',
     'The basilica is the centerpiece of the Taal Heritage Town, one of the best-preserved Spanish-colonial townscapes in the country. It remains an active pilgrimage church dedicated to St. Martin of Tours, the town''s patron saint, whose feast is celebrated every November 11.',
-    'https://picsum.photos/seed/taal-basilica/1200/800'
+    'https://picsum.photos/seed/taal-church/1200/800'
   ),
   (
     'Aguinaldo Shrine',
@@ -281,7 +285,7 @@ values
     14.2625, 121.4996,
     'The gorge and falls were declared the Pagsanjan Gorge National Park in 1939. River trips from the town of Pagsanjan have drawn travelers since the Spanish and American colonial periods, making it one of the country''s oldest tourist attractions.',
     'The boatmen''s craft of paddling and hauling canoes upstream through the rapids is a local tradition passed down through generations. The falls are central to the tourism identity of both Pagsanjan and Cavinti.',
-    'https://picsum.photos/seed/pagsanjan-falls/1200/800'
+    'https://picsum.photos/seed/falls/1200/800'
   ),
   (
     'Angono Petroglyphs',
@@ -293,7 +297,7 @@ values
     14.5328, 121.1868,
     'The engravings were rediscovered in 1965 by National Artist Carlos "Botong" Francisco during a field trip with boy scouts. Archaeological work that followed recovered stone tools and earthenware fragments, and the site was declared a National Cultural Treasure in 1973.',
     'The petroglyphs are a rare window into the beliefs of the islands'' early inhabitants and are believed to have been carved as part of healing or ritual practices. The site is on the Philippines'' tentative list for UNESCO World Heritage inscription.',
-    'https://picsum.photos/seed/angono-petroglyphs/1200/800'
+    'https://picsum.photos/seed/angono/1200/800'
   ),
   (
     'Villa Escudero',
