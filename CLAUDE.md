@@ -520,7 +520,7 @@ assets/                Icons, splash emblem (sources in assets/brand)
   apostrophe in "Clark's Folder" breaks it (even through a junction, because
   git reports the real top-level). Build with
   `cd /c/dev/vtour && EAS_NO_VCS=1 npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`
-  (junction `C:\devtour` exists; `EAS_NO_VCS` packs the folder honouring
+  (junction `C:\dev\vtour` exists; `EAS_NO_VCS` packs the folder honouring
   `.easignore`, which repeats `.gitignore` and drops `data/images`, `docs`,
   `tests`). `.env` never reaches EAS: the two `EXPO_PUBLIC_` values (plaintext /
   sensitive) and `GOOGLE_MAPS_ANDROID_API_KEY` (secret) are EAS environment
