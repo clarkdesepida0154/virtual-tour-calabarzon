@@ -8,10 +8,14 @@
  *   PLAYWRIGHT_MODULE    path to the `playwright` package (default: "playwright")
  *   PLAYWRIGHT_CHROMIUM  optional path to a chrome / headless-shell executable
  *
- * It serves <dist> on http://localhost:8765, walks Welcome → sign-in / sign-up
- * validation → guest → Explore + Add FAB → Details → Virtual Tour → Quiz →
- * Map → Progress → sign in → sign out → session persistence, and prints one
- * line per check. Signing in uses a confirmed throwaway user created directly
+ * It serves <dist> on http://localhost:8765, walks onboarding → Welcome →
+ * sign-in / sign-up validation → guest → Near me (location granted at
+ * Calamba) → favorites → Explore + Add FAB → Details (share, directions) →
+ * Virtual Tour → Quiz → Map → Progress (favorites) → offline cache → sign in
+ * → sign out → session persistence, then a second fresh browser for Skip,
+ * "Not now" and a refused location permission. It prints one line per check.
+ * Share and "Get directions" are captured by stubbing navigator.share and
+ * window.open (a headless browser has no share sheet or Maps app). Signing in uses a confirmed throwaway user created directly
  * in auth.users through SUPABASE_DB_URL (setup-script privilege). Every
  * progress row and the test user are deleted at the end, also on failure.
  *
@@ -64,17 +68,56 @@ async function expectVisible(page, locator, label) {
   }
 }
 const text = (page, value, exact = true) => page.getByText(value, { exact });
+/**
+ * Clicks the first match that can really receive the click. Needed where a
+ * dialog duplicates a label that also sits underneath its backdrop (e.g. the
+ * "Sign out" button behind the "Sign out?" confirmation).
+ */
+async function clickActionable(locator) {
+  const count = await locator.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const candidate = locator.nth(index);
+    try {
+      await candidate.click({ trial: true, timeout: 1500 });
+      await candidate.click();
+      return;
+    } catch {
+      // covered or hidden — try the next one
+    }
+  }
+  throw new Error(`no clickable match for ${locator}`);
+}
 
 const db = await connect({ log: () => {} });
 const EMAIL = `vtour-ui-check-${Date.now()}@example.com`;
 const PASSWORD = 'UiCheck-2026-pass';
 let testUserId = null;
 let guestKey = null;
+let guestKey2 = null;
 
 const browser = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {},
 );
-const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+/** Where the test "phone" is: Calamba, Laguna (next to the Rizal Shrine). */
+const CALAMBA = { latitude: 14.2117, longitude: 121.1653 };
+/** Records what the app hands to the share sheet and to Google Maps. */
+const CAPTURE_OUTBOUND = () => {
+  window.__shared = [];
+  window.__opened = [];
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: (data) => {
+      window.__shared.push(data);
+      return Promise.resolve();
+    },
+  });
+  window.open = (url) => {
+    window.__opened.push(String(url));
+    return null;
+  };
+};
+const context = await browser.newContext({ viewport: { width: 412, height: 915 }, geolocation: CALAMBA });
+await context.addInitScript(CAPTURE_OUTBOUND);
 const page = await context.newPage();
 page.on('console', (message) => {
   if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 200));
@@ -82,9 +125,29 @@ page.on('console', (message) => {
 page.on('pageerror', (error) => consoleErrors.push(`pageerror: ${error.message.slice(0, 200)}`));
 
 try {
-  // 1. Welcome
+  // 0. Onboarding (first launch only)
   await page.goto(BASE);
-  await expectVisible(page, text(page, 'Continue as guest'), 'Welcome: shown on first launch with Continue as guest');
+  await expectVisible(page, text(page, 'Step inside the region'), 'Onboarding: slide 1 (virtual tours) on first launch');
+  await expectVisible(page, page.getByLabel('Slide 1 of 3'), 'Onboarding: page dots say 1 of 3');
+  await expectVisible(page, page.getByLabel('Skip the introduction'), 'Onboarding: Skip offered');
+  await page.waitForTimeout(800);
+  await shot(page, 'onboarding-1');
+  await page.getByRole('button', { name: /^Next$/ }).click();
+  await expectVisible(page, text(page, 'Read, then test yourself'), 'Onboarding: slide 2 (learn & quiz)');
+  await page.waitForTimeout(600);
+  await shot(page, 'onboarding-2');
+  await page.getByRole('button', { name: /^Next$/ }).click();
+  await expectVisible(page, text(page, 'Track where you have been'), 'Onboarding: slide 3 (your journey)');
+  await page.waitForTimeout(600);
+  await shot(page, 'onboarding-3');
+  await page.getByRole('button', { name: /Get started/ }).click();
+
+  // 1. Welcome
+  await expectVisible(page, text(page, 'Continue as guest'), 'Welcome: shown after onboarding with Continue as guest');
+  await page.reload();
+  await expectVisible(page, text(page, 'Continue as guest'), 'Onboarding shown once: a reload goes straight to Welcome');
+  const onboardingAgain = await text(page, 'Step inside the region').isVisible().catch(() => false);
+  results.push(onboardingAgain ? 'FAIL  onboarding shown again' : 'ok    onboarding not shown again');
   await expectVisible(page, text(page, 'Create an account'), 'Welcome: Create an account');
   await expectVisible(page, text(page, 'Sign in'), 'Welcome: Sign in');
   await page.waitForTimeout(800);
@@ -133,9 +196,42 @@ try {
   await page.waitForTimeout(1500);
   await shot(page, 'home');
 
-  // 5. Explore + FAB
+  // 5. Explore + Near me + favorites + FAB
   await page.getByRole('tab', { name: /Explore/ }).click();
   await expectVisible(page, page.getByLabel('Add a destination'), 'Explore: Add FAB visible');
+  await expectVisible(page, text(page, 'See what is near you'), 'Near me: polite invitation shown before any permission dialog');
+  const distancesBefore = await text(page, /km away/, false).count();
+  results.push(distancesBefore === 0 ? 'ok    Near me: no distances before permission' : `FAIL  ${distancesBefore} distances before permission`);
+  await context.grantPermissions(['geolocation'], { origin: BASE }); // the person taps "Allow" in the browser dialog
+  await page.getByRole('button', { name: /Allow location/ }).click();
+  await expectVisible(page, text(page, /\d km away$/, false), 'Near me: cards show "… km away" once allowed');
+  const promptGone = !(await text(page, 'See what is near you').isVisible().catch(() => false));
+  results.push(promptGone ? 'ok    Near me: invitation hides after allowing' : 'FAIL  invitation still shown');
+  await page.getByRole('button', { name: /Nearest first/ }).click();
+  await page.waitForTimeout(500);
+  // From Calamba the Rizal Shrine is metres away ("… m away"), so match both units.
+  const firstCard = await page.getByRole('button', { name: /m away$/ }).filter({ visible: true }).first().getAttribute('aria-label');
+  results.push(/^Rizal Shrine,/.test(firstCard ?? '') ? 'ok    Near me: Nearest first puts Rizal Shrine (Calamba) on top' : `FAIL  nearest first: ${firstCard}`);
+  results.push(`info  nearest card: ${firstCard}`);
+  await page.waitForTimeout(1200);
+  await shot(page, 'explore-nearest');
+  await page.getByRole('button', { name: /Nearest first/ }).click();
+  await page.waitForTimeout(400);
+  const firstAZ = await page.getByRole('button', { name: /m away$/ }).filter({ visible: true }).first().getAttribute('aria-label');
+  results.push(/^Aguinaldo Shrine,/.test(firstAZ ?? '') ? 'ok    Near me: toggling off returns to A–Z' : `FAIL  A–Z order: ${firstAZ}`);
+
+  await page.getByLabel('Save Aguinaldo Shrine to favorites').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByLabel('Remove Aguinaldo Shrine from favorites'), 'Favorites: heart on a card fills at once');
+  await page.waitForTimeout(1500);
+  const favRows = await db.query('select count(*)::int n from public.favorites where device_id = $1', [guestKey]);
+  results.push(favRows.rows[0].n === 1 ? 'ok    Favorites: row saved in Supabase under the guest key' : `FAIL  favorites rows: ${favRows.rows[0].n}`);
+  await page.getByLabel('Save Corregidor Island to favorites').filter({ visible: true }).first().click();
+  await page.waitForTimeout(400);
+  await page.getByLabel('Remove Corregidor Island from favorites').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByLabel('Save Corregidor Island to favorites'), 'Favorites: tapping again un-hearts');
+  await page.waitForTimeout(1500);
+  const favRows2 = await db.query('select count(*)::int n from public.favorites where device_id = $1', [guestKey]);
+  results.push(favRows2.rows[0].n === 1 ? 'ok    Favorites: un-heart removes the row' : `FAIL  favorites rows after un-heart: ${favRows2.rows[0].n}`);
   await page.waitForTimeout(1200);
   await shot(page, 'explore-fab');
   await page.getByLabel('Add a destination').click();
@@ -149,8 +245,28 @@ try {
   await expectVisible(page, page.getByRole('button', { name: /^Quiz$/ }), 'Details: Quiz button');
   await expectVisible(page, text(page, 'View on the map'), 'Details: map preview card');
   await expectVisible(page, text(page, 'Manage this entry'), 'Details: Edit / Delete kept under Manage this entry');
+  await expectVisible(page, page.getByLabel('Remove Aguinaldo Shrine from favorites'), 'Details: heart shows the saved favorite');
+  await expectVisible(page, text(page, /km away · straight-line distance/, false), 'Details: distance from the user');
   await page.waitForTimeout(1500);
   await shot(page, 'details-top');
+  await page.getByLabel('Share Aguinaldo Shrine').click();
+  await page.waitForTimeout(400);
+  const shared = await page.evaluate(() => window.__shared.at(-1) ?? null);
+  const shareLines = (shared?.text ?? shared?.message ?? '').split('\n');
+  results.push(
+    shareLines.length === 3 && shareLines[0] === 'Aguinaldo Shrine' && shareLines[2] === 'Kawit • Cavite'
+      ? 'ok    Share: name, one-line description, "Kawit • Cavite"'
+      : `FAIL  Share payload: ${JSON.stringify(shared)}`,
+  );
+  results.push(`info  shared one-liner: ${shareLines[1]}`);
+  await page.getByRole('button', { name: /Get directions/ }).first().click();
+  await page.waitForTimeout(400);
+  const opened = await page.evaluate(() => window.__opened.at(-1) ?? null);
+  results.push(
+    /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=14\.\d+,120\.\d+$/.test(opened ?? '')
+      ? `ok    Directions: Google Maps universal link (${opened.split('=').pop()})`
+      : `FAIL  Directions URL: ${opened}`,
+  );
   await page.mouse.wheel(0, 700);
   await page.waitForTimeout(600);
   await shot(page, 'details-scrolled');
@@ -185,6 +301,11 @@ try {
   await text(page, 'Continue').click();
   await text(page, 'Finish the tour').click();
   await expectVisible(page, text(page, 'Tour complete'), 'Tour: completion step');
+  await expectVisible(page, text(page, 'You’ve toured it virtually — visit it in person'), 'Tour: completion invites a real visit');
+  await page.getByRole('button', { name: /Get directions/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(300);
+  const openedFromTour = await page.evaluate(() => window.__opened.at(-1) ?? null);
+  results.push(/google\.com\/maps\/dir\/\?api=1&destination=/.test(openedFromTour ?? '') ? 'ok    Tour: Get directions opens Google Maps' : `FAIL  tour directions: ${openedFromTour}`);
   await shot(page, 'tour-complete');
   await text(page, 'Mark as Visited').click();
   await expectVisible(page, text(page, 'Added to your visited places'), 'Tour: Mark as Visited shows completed state');
@@ -261,13 +382,37 @@ try {
   await expectVisible(page, page.getByLabel(/Cavite: 1 of 5 visited/), 'Progress: province breakdown');
   await expectVisible(page, text(page, 'Guest'), 'Progress: shows Guest');
   await expectVisible(page, page.getByRole('button', { name: /Create an account/ }), 'Progress: guest nudge to create an account');
+  await expectVisible(page, text(page, '1 saved place for your next visit'), 'Progress: Favorites section counts 1 saved place');
+  await expectVisible(page, page.getByRole('button', { name: /^Aguinaldo Shrine, Kawit • Cavite$/ }), 'Progress: favorite listed with its place');
   await page.waitForTimeout(1200);
   await shot(page, 'progress-guest');
   await page.mouse.wheel(0, 900);
   await page.waitForTimeout(500);
   await shot(page, 'progress-guest-scrolled');
 
+  // 11b. Offline: saved catalogue instead of an error
+  await page.getByRole('tab', { name: /Explore/ }).click();
+  await context.setOffline(true);
+  await page.getByRole('button', { name: /^Nature filter$/ }).first().click();
+  await expectVisible(page, text(page, 'Offline — showing saved data'), 'Offline: banner instead of the error state');
+  await expectVisible(page, page.getByRole('button', { name: /^Pagsanjan Falls,/ }), 'Offline: filters still work on the saved catalogue');
+  const offlineError = await text(page, 'No connection').isVisible().catch(() => false);
+  results.push(offlineError ? 'FAIL  error state shown while offline' : 'ok    Offline: no error state while saved data exists');
+  await page.waitForTimeout(800);
+  await shot(page, 'explore-offline');
+  await page.getByRole('button', { name: /^Pagsanjan Falls,/ }).first().click();
+  const detailsOffline = await page.getByRole('heading', { name: 'Pagsanjan Falls' }).filter({ visible: true }).first().isVisible().catch(() => false);
+  results.push(`info  offline Details for a never-opened place: ${detailsOffline ? 'shown' : 'error state (expected: only fetched details are saved)'}`);
+  await page.getByLabel('Go back').filter({ visible: true }).first().click();
+  await context.setOffline(false);
+  await page.getByRole('button', { name: 'Try to reconnect' }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(2500);
+  const bannerGone = !(await text(page, 'Offline — showing saved data').filter({ visible: true }).first().isVisible().catch(() => false));
+  results.push(bannerGone ? 'ok    Offline: Retry after reconnecting hides the banner' : 'FAIL  banner still shown online');
+  await page.getByRole('button', { name: /^Nature filter$/ }).first().click();
+
   // 12. Sign in from the Progress tab with a confirmed throwaway user
+  await page.getByRole('tab', { name: /Progress/ }).click();
   const created = await db.query(
     `insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
        raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -294,7 +439,8 @@ try {
 
   // 13. Sign out -> Welcome
   await page.getByRole('button', { name: /Sign out/ }).first().click();
-  await page.getByRole('button', { name: /^Sign out$/ }).last().click();
+  await page.waitForTimeout(400);
+  await clickActionable(page.getByRole('button', { name: /^Sign out$/ }).filter({ visible: true }));
   await expectVisible(page, text(page, 'Continue as guest'), 'Sign out returns to Welcome');
   await shot(page, 'after-sign-out');
 
@@ -307,21 +453,50 @@ try {
   await page.reload();
   await page.getByRole('tab', { name: /Progress/ }).click();
   await expectVisible(page, page.getByLabel(`Signed in as ${EMAIL}`), 'Session persists across a reload (AsyncStorage)');
+
+  // 15. A second, fresh browser: Skip, "Not now", and a refused permission
+  const fresh = await browser.newContext({ viewport: { width: 412, height: 915 } });
+  await fresh.addInitScript(CAPTURE_OUTBOUND);
+  const second = await fresh.newPage();
+  await second.goto(BASE);
+  await second.getByLabel('Skip the introduction').click();
+  await expectVisible(second, text(second, 'Continue as guest'), 'Onboarding: Skip goes straight to Welcome');
+  await text(second, 'Continue as guest').click();
+  guestKey2 = await second.evaluate(() => localStorage.getItem('vtour.deviceId'));
+  await second.getByRole('tab', { name: /Explore/ }).click();
+  await expectVisible(second, text(second, 'See what is near you'), 'Near me (fresh install): invitation shown');
+  await second.getByRole('button', { name: /^Not now$/ }).click();
+  await second.waitForTimeout(400);
+  const stillPrompt = await text(second, 'See what is near you').isVisible().catch(() => false);
+  results.push(stillPrompt ? 'FAIL  "Not now" did not hide the invitation' : 'ok    Near me: "Not now" hides the invitation');
+  await second.reload();
+  await second.getByRole('tab', { name: /Explore/ }).click();
+  await second.getByLabel('Add a destination').waitFor({ timeout: 15000 });
+  const promptAfterReload = await text(second, 'See what is near you').isVisible().catch(() => false);
+  results.push(promptAfterReload ? 'FAIL  invitation back after reload' : 'ok    Near me: "Not now" is remembered');
+  // No permission granted: the browser refuses, and the feature simply hides.
+  await second.getByRole('button', { name: /Nearest first/ }).click();
+  await second.waitForTimeout(1500);
+  const chipLeft = await second.getByRole('button', { name: /Nearest first/ }).isVisible().catch(() => false);
+  const kmShown = await text(second, /km away/, false).count();
+  results.push(!chipLeft && kmShown === 0 ? 'ok    Near me: refused permission hides the feature (no chip, no distances)' : `FAIL  after refusal: chip ${chipLeft}, distances ${kmShown}`);
+  await fresh.close();
 } catch (error) {
-  results.push(`FAIL  aborted: ${error.message.split('\n')[0]}`);
+  results.push(`FAIL  aborted: ${error.message.split('\n').slice(0, 4).join(' | ')}`);
   await shot(page, 'aborted').catch(() => {});
 } finally {
   // Clean-up: guest + test user progress rows, and the test user.
-  for (const key of [guestKey, testUserId].filter(Boolean)) {
+  for (const key of [guestKey, guestKey2, testUserId].filter(Boolean)) {
     await db.query('delete from public.quiz_attempts where device_id = $1', [key]);
     await db.query('delete from public.destination_completions where device_id = $1', [key]);
+    await db.query('delete from public.favorites where device_id = $1', [key]);
   }
   if (testUserId) await db.query('delete from auth.users where id = $1', [testUserId]);
   const left = await db.query(
     `select (select count(*) from public.quiz_attempts)::int a, (select count(*) from public.destination_completions)::int c,
-            (select count(*) from auth.users)::int u`,
+            (select count(*) from public.favorites)::int f, (select count(*) from auth.users)::int u`,
   );
-  results.push(`info  after clean-up: attempts ${left.rows[0].a}, completions ${left.rows[0].c}, auth users ${left.rows[0].u}`);
+  results.push(`info  after clean-up: attempts ${left.rows[0].a}, completions ${left.rows[0].c}, favorites ${left.rows[0].f}, auth users ${left.rows[0].u}`);
   await db.end();
   await browser.close();
   server.close();
