@@ -1,0 +1,24 @@
+# Normalise text to LF in the repository on every platform (the project is
+# developed on Windows; Metro, eslint and the Node scripts all expect LF).
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary assets: never diff, never touch line endings.
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.webp binary
+*.ico  binary
+*.ttf  binary
+*.otf  binary
+*.apk  binary
+*.aab  binary
+
+# Generated files: collapsed in GitHub diffs, excluded from language stats.
+data/IMAGE_CREDITS.md linguist-generated=true
+package-lock.json     linguist-generated=true
+data/destinations-seed.json linguist-detectable=false

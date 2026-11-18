@@ -68,6 +68,7 @@
     "db:seed": "node scripts/seed-full-dataset.js",
     "db:sync-photos": "node scripts/sync-photos.js",
     "data:check": "node scripts/check-dataset.js",
+    "secrets:check": "node scripts/secret-scan.js",
     "images:fetch": "node scripts/fetch-images.js",
     "images:find": "node scripts/find-commons-images.js"
   },
