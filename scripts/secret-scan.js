@@ -45,7 +45,9 @@ for (const [where, body] of Object.entries(allText)) {
   const count = (needle) => (needle ? body.split(needle).length - 1 : 0);
   report(`${where} — database password (raw)`, count(password));
   report(`${where} — database password (URL-encoded)`, encodedPw !== password ? count(encodedPw) : 0);
-  report(`${where} — "sb_secret"`, count('sb_secret'));
+  // A real Supabase secret key is "sb_secret_" followed by key material; the bare
+  // prefix (as written in this file and the docs) is not a secret.
+  report(`${where} — Supabase secret keys (sb_secret_…)`, (body.match(/sb_secret_[A-Za-z0-9_-]{16,}/g) || []).length);
   const conns = [...body.matchAll(connWithPassword)]
     .filter((m) => !/^(\$\{|\*{3,}|<|password|PASSWORD|\[)/.test(m[1])); // placeholders / masked
   report(`${where} — connection strings with a literal password`, conns.length);
