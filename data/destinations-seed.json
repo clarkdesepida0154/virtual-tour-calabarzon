@@ -1392,12 +1392,12 @@
         {
           "role": "cover",
           "file": "cover.jpg",
-          "commons_title": "File:Pagsanjan Falls, Laguna, Philippines - panoramio.jpg",
-          "author": "Andrew Martin",
-          "license": "CC BY 3.0",
-          "license_url": "https://creativecommons.org/licenses/by/3.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls,_Laguna,_Philippines_-_panoramio.jpg",
-          "caption": "Photo: Andrew Martin, CC BY 3.0, via Wikimedia Commons"
+          "commons_title": "File:George Washington Sailors Participate in Manila MWR Tour (9169847).jpg",
+          "author": "U.S. Navy photo by Petty Officer 2nd Class Bruce Morgan",
+          "license": "Public domain",
+          "license_url": null,
+          "source_url": "https://commons.wikimedia.org/wiki/File:George_Washington_Sailors_Participate_in_Manila_MWR_Tour_(9169847).jpg",
+          "caption": "Photo: U.S. Navy photo by Petty Officer 2nd Class Bruce Morgan, Public domain, via Wikimedia Commons"
         },
         {
           "role": "gallery",
@@ -1412,11 +1412,11 @@
         {
           "role": "gallery",
           "file": "gallery-2.jpg",
-          "commons_title": "File:Pagsanjan Falls - Pagsanjan, Laguna 1.jpg",
+          "commons_title": "File:Pagsanjan Falls - Pagsanjan, Laguna 2.jpg",
           "author": "Kathleen Mae Tugano",
           "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls_-_Pagsanjan,_Laguna_1.jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls_-_Pagsanjan,_Laguna_2.jpg",
           "caption": "Photo: Kathleen Mae Tugano, CC BY-SA 4.0, via Wikimedia Commons"
         }
       ],

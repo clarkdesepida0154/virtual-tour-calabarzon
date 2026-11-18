@@ -66,6 +66,7 @@
     "db:test": "tsx scripts/verify-crud.mjs",
     "auth:test": "tsx scripts/verify-auth.mjs",
     "db:seed": "node scripts/seed-full-dataset.js",
+    "db:sync-photos": "node scripts/sync-photos.js",
     "data:check": "node scripts/check-dataset.js",
     "images:fetch": "node scripts/fetch-images.js",
     "images:find": "node scripts/find-commons-images.js"

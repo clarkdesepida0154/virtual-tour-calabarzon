@@ -59,9 +59,9 @@ This file is generated from `data/destinations-seed.json` — edit that, not thi
 
 | File | Author | Licence | Source |
 | --- | --- | --- | --- |
-| `pagsanjan-falls/cover.jpg` | Andrew Martin | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0) | [Commons page](https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls,_Laguna,_Philippines_-_panoramio.jpg) |
+| `pagsanjan-falls/cover.jpg` | U.S. Navy photo by Petty Officer 2nd Class Bruce Morgan | Public domain | [Commons page](https://commons.wikimedia.org/wiki/File:George_Washington_Sailors_Participate_in_Manila_MWR_Tour_(9169847).jpg) |
 | `pagsanjan-falls/gallery-1.jpg` | 문세진 | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0) | [Commons page](https://commons.wikimedia.org/wiki/File:20150201_5%EC%9D%BC%EC%B0%A8_Pagsanjan_Falls_Tour_-_panoramio.jpg) |
-| `pagsanjan-falls/gallery-2.jpg` | Kathleen Mae Tugano | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [Commons page](https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls_-_Pagsanjan,_Laguna_1.jpg) |
+| `pagsanjan-falls/gallery-2.jpg` | Kathleen Mae Tugano | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [Commons page](https://commons.wikimedia.org/wiki/File:Pagsanjan_Falls_-_Pagsanjan,_Laguna_2.jpg) |
 
 ## Nagcarlan Underground Cemetery
 
