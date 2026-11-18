@@ -2,7 +2,7 @@
   "expo": {
     "name": "Virtual Tour & Cultural Mapping",
     "slug": "virtual-tour-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "virtualtourapp",
@@ -15,7 +15,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.clark0154.virtualtour"
+      "package": "com.clark0154.virtualtour",
+      "versionCode": 2
     },
     "web": {
       "output": "single",
@@ -37,6 +38,16 @@
           "locationWhenInUsePermission": "Virtual Tour uses your location only on this phone, to show how far each destination is from you.",
           "isAndroidBackgroundLocationEnabled": false,
           "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "extraProguardRules": "# --- Run 4.1: v1.0.0 crashed at launch (R8) ---\n# WorkManager arrives via react-native-maps (androidx.work:work-runtime). It starts\n# from androidx.startup.InitializationProvider and creates its Room database\n# (WorkDatabase_Impl) by reflection, which R8 renamed/removed.\n-keep class androidx.work.** { *; }\n-keepnames class androidx.work.impl.WorkDatabase\n-keep class androidx.startup.** { *; }\n-keep class * implements androidx.startup.Initializer { <init>(); }\n-keep class androidx.room.** { *; }\n-keep class * extends androidx.room.RoomDatabase { *; }\n-keep class **_Impl { *; }\n-dontwarn androidx.work.**\n# react-native-maps / Google Maps\n-keep class com.rnmaps.** { *; }\n-keep class com.google.android.gms.maps.** { *; }\n# Expo modules are registered by name\n-keep class expo.modules.** { *; }"
+          }
         }
       ]
     ],
