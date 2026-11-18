@@ -516,6 +516,20 @@ assets/                Icons, splash emblem (sources in assets/brand)
 - `db:seed` deletes and re-inserts every destination, which cascades away all
   quiz attempts, visits and favorites. Never use it just to change photos —
   use `db:sync-photos`.
+- **EAS builds**: EAS shallow-clones the repo through a `file://` URL, and the
+  apostrophe in "Clark's Folder" breaks it (even through a junction, because
+  git reports the real top-level). Build with
+  `cd /c/dev/vtour && EAS_NO_VCS=1 npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`
+  (junction `C:\devtour` exists; `EAS_NO_VCS` packs the folder honouring
+  `.easignore`, which repeats `.gitignore` and drops `data/images`, `docs`,
+  `tests`). `.env` never reaches EAS: the two `EXPO_PUBLIC_` values (plaintext /
+  sensitive) and `GOOGLE_MAPS_ANDROID_API_KEY` (secret) are EAS environment
+  variables for `preview` and `production`. `app.config.js` fails an EAS
+  Android build that lacks the Maps key.
+- `eas credentials` is interactive only. The keystore fingerprints come from
+  the Expo GraphQL API (`androidAppBuildCredentialsList → androidKeystore →
+  sha1CertificateFingerprint`); the APK is v2-signed only, so JRE 8's
+  `keytool -printcert -jarfile` cannot read it.
 - `sharp` is a devDependency used only by the Node scripts. Never import it
   (or anything under `scripts/`) from `src/`.
 
@@ -579,7 +593,7 @@ Run 4
 - [x] Public GitHub repo `clarkdesepida0154/virtual-tour-calabarzon` after a clean secret scan; `.gitattributes`
 - [x] Portfolio README with 8 screenshots (`docs/screenshots/`)
 - [x] Device check by the owner on Android and iOS (Runs 1–3 features)
-- [ ] EAS APK (`eas.json` preview profile, `android.package` com.clark0154.virtualtour) — see the Run 4 report for status
+- [x] EAS APK v1.0.0 (preview profile, `com.clark0154.virtualtour`, EAS-managed keystore SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`) attached to GitHub Release v1.0.0
 - [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (still ON at the end of Run 4)
 - [ ] Owner: restrict the Google Maps key to the package name + the EAS keystore SHA-1
 
