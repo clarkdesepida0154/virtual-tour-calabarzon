@@ -1,167 +1,258 @@
-# Virtual Tour and Cultural Mapping App
+# Virtual Tour & Cultural Mapping — CALABARZON
 
-A mobile app for exploring the major tourist destinations and cultural heritage
-sites of **Region IV-A (CALABARZON), Philippines** — Cavite, Laguna, Batangas,
-Rizal and Quezon — as an alternative to educational field trips.
+**A museum-style mobile guide to 26 heritage sites and natural landmarks of
+Region IV-A, Philippines — built as a field trip you can take from a phone.**
 
-School project for **WMA 306 — UI/UX and Cross-Platform Applications**.
+Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android & iOS
 
-Built with Expo (SDK 58) + TypeScript, Expo Router, React Native Paper and
-Supabase. It runs entirely inside **Expo Go** — no native build needed.
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/onboarding.jpg" width="190" alt="Onboarding: Step inside the region"><br><sub>First launch</sub></td>
+    <td align="center"><img src="docs/screenshots/home.jpg" width="190" alt="Home with the Featured carousel"><br><sub>Home</sub></td>
+    <td align="center"><img src="docs/screenshots/explore-near-me.jpg" width="190" alt="Explore sorted nearest first with distances"><br><sub>Explore · Near me</sub></td>
+    <td align="center"><img src="docs/screenshots/details.jpg" width="190" alt="Destination details with favorite, share and directions"><br><sub>Details</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/tour-gallery.jpg" width="190" alt="Virtual tour gallery with photo credit"><br><sub>Virtual tour · gallery</sub></td>
+    <td align="center"><img src="docs/screenshots/tour-history.jpg" width="190" alt="Virtual tour history chapter"><br><sub>Virtual tour · chapter</sub></td>
+    <td align="center"><img src="docs/screenshots/quiz.jpg" width="190" alt="Quiz with instant feedback"><br><sub>Quiz</sub></td>
+    <td align="center"><img src="docs/screenshots/progress.jpg" width="190" alt="Progress tab with favorites"><br><sub>Progress & favorites</sub></td>
+  </tr>
+</table>
 
-## What it does
+## Why it exists
 
-The app opens on a **Welcome** screen: create an account, sign in with email
-and password, or **continue as a guest**. Guests get every feature — an
-account only means your progress follows your email to another phone. The
-four tabs are **Home, Explore, Map and Progress**.
+School field trips to the shrines, churches and heritage towns of Cavite,
+Laguna, Batangas, Rizal and Quezon are expensive and rare. This app offers the
+next best thing: each destination is presented like a gallery exhibit — a
+photo wall, a history chapter, a chapter on cultural significance — followed by
+a short quiz written from that same text. When the virtual visit is done, it
+hands over to Google Maps for the real one.
 
-| Screen | What you can do |
+It was built for **WMA 306 — UI/UX and Cross-Platform Applications**, where the
+interface itself is graded, so design consistency, accessibility and empty /
+error states were treated as first-class requirements rather than polish.
+
+## Features
+
+**Learn**
+- **Guided virtual tour** — full-screen sequence: introduction → swipeable
+  photo gallery (every photo credited) → History → Cultural Significance →
+  completion. Steps without content are skipped; Android back steps back.
+- **Quiz engine** — five questions per destination, options reshuffled on
+  every attempt, instant right/wrong feedback, score ring, unlimited retakes,
+  best score kept. Every question is answerable from the destination's own
+  text (checked by `npm run data:check`).
+
+**Explore**
+- **Search and filters** — search-as-you-type on name and town, combinable
+  category and province filters, pull to refresh.
+- **Near me** — with permission, each card shows "12.4 km away" and Explore can
+  sort nearest first. Distances are computed on the device (haversine); no
+  location ever leaves the phone. Permission is requested through an in-app
+  explanation first, and declining simply hides the feature.
+- **Map** — all 26 destinations on Google Maps, pins coloured by category, a
+  legend that doubles as a filter, callouts that open the destination.
+- **Get directions** — from a destination or the end of its tour, opens Google
+  Maps with turn-by-turn directions from the current location (universal
+  link, no API key; falls back to the browser when the app is not installed).
+- **Share** — the native share sheet with the name, a one-line description and
+  "Town • Province".
+
+**Track**
+- **Progress** — visited count out of 26, quiz statistics, a completion bar
+  per province, and a "Your journey" timeline.
+- **Favorites** — a heart on every card and destination page, collected on
+  the Progress tab.
+- **Accounts are optional** — guests get every feature; signing up with email
+  and password moves the guest's visits, scores and favorites to the account.
+
+**Feel**
+- **Works offline** — the last-fetched catalogue and destination pages are
+  kept on the device; without a connection the app shows them with a quiet
+  "Offline — showing saved data" banner instead of an error.
+- **Haptics** on answering a question, finishing a quiz and marking a place
+  visited.
+- **Onboarding** — a three-slide introduction on first launch, skippable and
+  shown once.
+- **Content management** — add, edit and delete destinations from the app,
+  including photo picking, resizing and upload to cloud storage.
+
+## Tech stack
+
+| Area | Choice |
 | --- | --- |
-| **Home** | See the app intro, search (jumps to Explore), swipe the Featured carousel, and tap a category or province to open Explore pre-filtered. |
-| **Explore** | Search as you type by name or town, combine a category filter with a province filter, pull down to refresh. The **Add** button adds a new destination. |
-| **Map** | All 26 destinations on Google Maps, coloured by category. Tap a legend chip to show one category; tap a pin for its name and category, then open its page. |
-| **Progress** | Who you are signed in as (or Guest), how many of the 26 destinations you have visited, quizzes taken, average and best score, progress per province, and your journey so far. |
-| **Details** | Photo, address, category and province, description, a small map, History and Cultural Significance. **Start Virtual Tour** and **Quiz** sit at the bottom; Edit and Delete are under "Manage this entry". |
-| **Virtual Tour** | A full-screen, museum-style walk-through: introduction → photo gallery (with credits) → History → Cultural Significance → "Mark as Visited" → on to the quiz. |
-| **Quiz** | Five multiple-choice questions, answers shuffled every time. Each answer is marked right (green) or wrong (terracotta) straight away; the score screen shows X/5 and a percentage. Retake as often as you like — your best score is kept. |
-| **Add / Edit** | One shared form with validation, dropdowns for category and province, optional coordinates, and a photo picker that resizes to 1600px and uploads to Supabase Storage. |
+| App | [Expo](https://expo.dev) SDK 58, React Native 0.88, React 19 with the React Compiler, TypeScript in strict mode |
+| Navigation | Expo Router (file-based) — a root stack with protected route groups around four bottom tabs; typed routes |
+| UI | React Native Paper (Material Design 3) re-themed with custom tokens; Playfair Display + Inter; Reanimated for step transitions; react-native-svg for the progress ring |
+| Maps & device | react-native-maps (Google Maps on Android), expo-location, expo-haptics, expo-image (with disk cache), expo-image-picker / manipulator |
+| Backend | [Supabase](https://supabase.com): Postgres with Row Level Security, Storage for photos, Auth (email + password) |
+| Local storage | AsyncStorage for the session, the guest key, one-time flags and the offline catalogue |
+| Tooling | ESLint (expo config), Node's built-in test runner via tsx, Playwright for the web click-through, EAS Build for the APK |
 
-## Run it on your Android phone
+Everything runs in **Expo Go** — no native module outside the Expo Go set is
+used, so the app can be opened on any phone by scanning a QR code.
 
-You need [Node.js](https://nodejs.org) 20 or newer on the computer, and the
-**Expo Go** app from the Play Store on the phone.
-
-```bash
-cd virtual-tour-app
-npm install
-npx expo start
-```
-
-1. Put the phone and the computer on the **same Wi-Fi network**.
-2. Open **Expo Go** on the phone and tap **Scan QR code**.
-3. Scan the QR code shown in the terminal. The app loads in a few seconds.
-
-If the phone cannot connect:
-
-- Allow Node.js through Windows Firewall when Windows asks (private networks).
-- Some school or public Wi-Fi networks block device-to-device traffic. Use a
-  phone hotspot, or run `npx expo start --tunnel` instead.
-- In Expo Go you can also type the address by hand: **Enter URL manually** →
-  `exp://<your-computer-ip>:8081`.
-
-## Configuration
-
-The app reads two values from `.env` (copy `.env.example` to create it):
+## Architecture
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-SUPABASE_DB_URL=
-GOOGLE_MAPS_ANDROID_API_KEY=
+ screens (src/app)          components (src/components)
+        │ read via hooks          │ shared UI, design tokens only
+        ▼                         ▼
+ hooks (useAsyncData) ──► repositories (src/repositories) ──► supabase-js ──► Postgres / Storage / Auth
+        │                         ▲
+        │ offline fallback        │ same factories, run in Node by the live test scripts
+        ▼                         │
+ offline cache (AsyncStorage)   pure logic (src/lib): quiz scoring, progress stats,
+                                distances, favorites merge, share text, form rules
 ```
 
-- The two `EXPO_PUBLIC_` values are bundled into the app. The publishable key
-  is safe to ship: it maps to the database's `anon` role (or `authenticated`
-  once someone signs in).
-- `SUPABASE_DB_URL` is used **only** by the setup and test scripts. App code
-  never reads it. `.env` is git-ignored — never commit it.
-- `GOOGLE_MAPS_ANDROID_API_KEY` can stay empty: Expo Go shows Google Maps with
-  its own key. It is needed only for a standalone Android build (APK).
-
-### Accounts: one setting to change
-
-Email sign-up works best with **"Confirm email" turned off** in the Supabase
-dashboard: **Authentication → Sign In / Providers → Email → Confirm email →
-off**. While it is on, new users must click a link in an email before they can
-sign in, and Supabase's built-in email service only sends a few emails per
-hour, so most sign-ups would fail. Guests are not affected.
-
-Restart `npx expo start` after changing `.env`.
-
-## Content: 26 destinations
-
-The app ships with a complete dataset of 26 major CALABARZON destinations —
-5 in Cavite, 6 in Laguna, 5 in Batangas, 5 in Rizal and 5 in Quezon. Each has a
-short description, a history, a note on its cultural significance, a verified
-address and coordinates, three photos, and a five-question quiz.
-
-It all lives in one reviewable file, `data/destinations-seed.json`, together
-with the sources each entry was checked against and a list of the claims that
-were deliberately softened ("often cited as…") because sources disagree.
-
-**Photos** come only from [Wikimedia Commons](https://commons.wikimedia.org),
-under public-domain, CC0, CC BY or CC BY-SA terms. The resized copies are in
-`data/images/`, and `data/IMAGE_CREDITS.md` lists the author and licence of
-every one. In the app, the credit is shown on each destination's page.
+- **Repository pattern.** Screens never import supabase-js. Each repository
+  is a factory that receives a client (`createDestinationsRepository(client)`),
+  so the exact code the app runs is also exercised against the live database
+  by `npm run db:test` under Node.
+- **Read hooks, not a global store.** `useAsyncData` gives every read a
+  `loading / error / success` state, retry and pull-to-refresh, ignores stale
+  responses, and refetches when any screen reports a write through a tiny
+  `DataSyncContext` counter. No Redux; four small contexts in total, plus
+  location and favorites.
+- **Identity model.** Progress rows carry one "user key": the Supabase auth
+  user id when signed in, otherwise a random device UUID kept in AsyncStorage.
+  Guests and accounts therefore share one code path, and signing up is a
+  single re-keying of the guest's rows (with duplicates resolved first).
+- **Offline by degradation, not sync.** Every successful catalogue read is
+  saved; an offline failure is answered from the saved copy, and filtered
+  Explore searches are re-run locally on the saved catalogue. Writes still
+  need a connection and say so.
+- **Design system.** All colours, type ramps, spacing (4/8 pt), radii, shadows
+  and sizes live in `src/theme`; screens contain no literal colours or font
+  sizes. The palette — terracotta, heritage gold, warm cream — and the serif
+  headings follow the look of a national museum's exhibit labels. Every screen
+  has skeleton loading, a friendly empty state and an error state with retry;
+  touch targets are at least 48 dp and font scaling is capped at 1.3×.
+- **Content as data.** The 26 destinations, their texts, photo credits and
+  quizzes live in one reviewable file, `data/destinations-seed.json`, with the
+  sources each entry was checked against. Nothing in the app refers to a
+  specific destination.
 
 ## Database
 
-- `supabase/schema.sql` creates the structure: six tables, Row Level Security
-  policies and the public `destination-images` storage bucket.
-- `data/destinations-seed.json` is the content that gets loaded into it.
+`supabase/schema.sql` defines the structure; `data/destinations-seed.json` is
+the content. Additive changes ship as idempotent files in
+`supabase/migrations/` (applied with `npm run db:migrate`, never a reset).
 
-| Command | What it does |
+| Table | Holds |
 | --- | --- |
-| `npm run db:setup` | **Full reset.** Recreates the tables, then loads the 26 destinations with their photos and quizzes, then verifies. Destinations added from the app are removed. |
-| `npm run db:seed` | Reloads the 26 destinations without recreating the tables. Safe to run repeatedly. |
-| `npm run db:verify` | Checks the live database without changing anything: 26 destinations, each with a cover photo, 3 photo rows and 5 valid quiz questions, and that photo links work. |
-| `npm run db:test` | Exercises the app's real data layer against the live project (read, search, filters, create, update, delete, photo upload, quiz questions, quiz attempts and best scores, visited destinations, the Progress summary) and cleans up after itself. |
-| `npm run auth:test` | Checks sign-in, sign-out, friendly error messages and that a signed-in user can read and save progress, with a temporary test account that it deletes again. |
-| `npm test` | Unit tests for the quiz scorer, answer shuffling, progress statistics and form validation. |
-| `npm run data:check` | Validates the dataset file offline, including that every quiz answer can be found in that destination's own text. |
-| `npm run images:fetch` | Downloads and resizes any photo named in the dataset that is missing from `data/images`. |
-| `npm run images:find` | Helper for choosing photos: builds a contact sheet of usable Commons images. |
+| `destinations` | The catalogue: name, description, address, town, province and category (both CHECK-constrained), coordinates, history, cultural significance, cover photo |
+| `destination_images` | Ordered photos per destination with their credit lines (row 0 is the cover) |
+| `quiz_questions` / `quiz_options` | Five questions per destination, four options each, exactly one correct |
+| `quiz_attempts` | One row per finished quiz, by user key |
+| `destination_completions` | "Visited" marks, unique per destination and user key |
+| `favorites` | Hearted destinations, unique per destination and user key |
 
-The setup scripts connect with `SUPABASE_DB_URL`. Supabase's direct database
-host is IPv6-only, so if the saved address stops working the script tries the
-IPv4 connection poolers and saves the one that works back into `.env`.
+All child tables cascade on delete. Row Level Security is enabled on every
+table. For this school project the policies are intentionally permissive for
+both `anon` (guests) and `authenticated` users; `schema.sql` documents how a
+production deployment would scope progress rows to `auth.uid()` and restrict
+catalogue edits to editors.
 
-## Project layout
+## Getting started
+
+**Try it:** the Android APK is attached to the
+[latest release](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/latest).
+
+**Run it from source** (Node.js 20+, the Expo Go app on a phone):
+
+```bash
+git clone https://github.com/clarkdesepida0154/virtual-tour-calabarzon.git
+cd virtual-tour-calabarzon
+npm install
+cp .env.example .env        # then fill in the values below
+npx expo start              # scan the QR code with Expo Go
+```
+
+`.env` (git-ignored — `.env.example` lists the same names):
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `EXPO_PUBLIC_SUPABASE_URL` | app | Your Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | app | The publishable key (safe to ship; access is governed by RLS) |
+| `SUPABASE_DB_URL` | setup and test scripts only | Postgres connection string (session pooler); never read by app code |
+| `GOOGLE_MAPS_ANDROID_API_KEY` | standalone Android builds only | Expo Go brings its own Maps key |
+
+To create your own backend, make a Supabase project, fill in `.env`, then run
+`npm run db:setup` — it creates the schema, uploads the 78 photos and loads
+the full dataset. For email sign-up without a confirmation email, turn off
+*Authentication → Sign In / Providers → Email → Confirm email*.
+
+If the phone cannot reach the dev server, put both devices on the same
+network, allow Node.js through the firewall, or use `npx expo start --tunnel`.
+
+**Build the APK:** `npx eas-cli build --platform android --profile preview`
+(see `eas.json`; the Supabase values and the Maps key are supplied as EAS
+environment variables).
+
+## Testing
+
+| Suite | Command | What it covers | Checks |
+| --- | --- | --- | --- |
+| Unit | `npm test` | Quiz scoring and shuffling, best scores, progress statistics, auth validation, distances and sorting, favorites merge and transfer rules, offline cache, directions link, share text | 44 |
+| Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage upload, quiz rows, attempts, visits, favorites (idempotency, isolation, cascade), guest → account transfer. Cleans up after itself | 38 |
+| Auth (live) | `npm run auth:test` | Sign-in and sign-out, signed-in RLS, progress under the auth user id, friendly errors, with a temporary user | 6 |
+| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build: onboarding, Welcome, guest, Near me, favorites, share, directions, tour, quiz, map, progress, offline banner, sign in / out, session restore | 94 |
+| Dataset | `npm run data:check` | Schema of the content file, and that every quiz answer appears in its destination's text | — |
+| Database | `npm run db:verify` | Tables, RLS policies, the 26 destinations, 78 photos and 130 questions, live photo links | — |
+| Static | `npm run typecheck` · `npm run lint` · `npx expo-doctor` | Strict TypeScript, ESLint, 20 Expo project checks | — |
+| Secrets | `npm run secrets:check` | No password, secret key or credentialed connection string in any file or any commit | — |
+
+## Content and image licensing
+
+Texts were written for this project in a neutral, museum-label register and
+checked against Wikipedia and official or heritage sources; contested claims
+are attributed rather than stated, and each entry records its sources and
+caveats in the dataset.
+
+All 78 photographs come from [Wikimedia Commons](https://commons.wikimedia.org)
+under public-domain, CC0, CC BY or CC BY-SA terms. Each photo's author and
+licence are shown in the app wherever the photo appears large, and listed in
+full in [`data/IMAGE_CREDITS.md`](data/IMAGE_CREDITS.md). The photos keep
+their original licences; they are not covered by the code licence.
+
+## Project structure
 
 ```
 src/
-  app/                 Screens (Expo Router — each file is a route)
-                       welcome, sign-in, sign-up, add
+  app/                 Routes (Expo Router): onboarding, welcome, sign-in, sign-up, add
     (tabs)/            Home, Explore, Map, Progress
     destination/[id]/  Details, Edit, Virtual Tour, Quiz
-  components/          Reusable UI (cards, chips, form fields, states)
-  constants/           Provinces and categories
-  context/             Small shared state: filters, data refresh, toasts, who is signed in
-  hooks/               Data-loading hooks
-  lib/                 Supabase client, quiz scoring, progress stats, form logic, helpers
+  components/          Shared UI — cards, chips, badges, states, form, map
+  context/             Data sync, filters, toasts, identity, location, favorites
+  hooks/               Data-loading hooks (useAsyncData and friends)
+  lib/                 Pure logic + device helpers (quiz, progress, geo, favorites, offline cache)
   repositories/        The only code that talks to Supabase
-  theme/               Design tokens: colours, type, spacing
-  types/               Handwritten database types
-data/
-  destinations-seed.json   The content: 26 destinations, photos, quizzes
-  images/                  Processed photos, one folder per destination
-  IMAGE_CREDITS.md         Author and licence of every photo
-supabase/schema.sql    Database structure
-scripts/               Setup, seeding, verification and photo tools
+  theme/               Design tokens and the Paper / navigation / map themes
+supabase/              schema.sql and additive migrations
+data/                  The dataset, processed photos, photo credits
+scripts/               Setup, seeding, migrations, live tests, photo curation, secret scan
 tests/                 Unit tests
 ```
 
-## Checks
+## Roadmap
 
-```bash
-npm run typecheck   # TypeScript, strict
-npm run lint        # ESLint (Expo config)
-npm test            # unit tests (quiz scorer, progress, validation)
-npm run data:check  # the dataset file
-npm run db:verify   # the live database holds the full dataset
-npm run db:test     # data layer against the live database
-npm run auth:test   # sign-in and signed-in progress against the live project
-```
+- **Dark mode** — the tokens are already centralised; a second palette and a
+  system-theme switch are the remaining work.
+- **English / Filipino** — move UI strings and dataset texts to a translation
+  layer and add Filipino versions of the 26 entries.
+- **Google Play release** — signed AAB, store listing, and the production RLS
+  policies described in `schema.sql`.
+- Audio narration for each tour chapter, and more destinations per province.
 
 ## Known limitations
 
-- Security is deliberately open for this school project: anyone using the app
-  can add, edit and delete destinations, and progress rows are not locked to
-  their owner in the database. `supabase/schema.sql` explains how a real
-  deployment would restrict them. Running `npm run db:seed` restores the
-  original 26 destinations.
-- Guests' progress lives on that phone (a random id stored by the app).
-  Uninstalling the app loses it; signing up first keeps it.
-- In the web preview the map is a simple schematic — Google Maps itself only
-  runs in the phone app.
+- Database security is deliberately open for a classroom project (anyone can
+  edit the catalogue; progress rows are not owner-locked in the database).
+- A guest's progress is tied to that installation until they create an account.
+- Offline mode shows destinations already loaded once; quizzes and progress
+  updates need a connection.
+- The web build is used for automated testing only; its map is a schematic
+  stand-in because native Google Maps runs only on the phone.

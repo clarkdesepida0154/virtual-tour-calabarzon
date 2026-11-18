@@ -259,6 +259,8 @@ try {
       : `FAIL  Share payload: ${JSON.stringify(shared)}`,
   );
   results.push(`info  shared one-liner: ${shareLines[1]}`);
+  const falseAlarm = await text(page, 'Sharing isn’t available on this device.').isVisible().catch(() => false);
+  results.push(falseAlarm ? 'FAIL  Share: "not available" toast after a successful share' : 'ok    Share: no error toast after a successful share');
   await page.getByRole('button', { name: /Get directions/ }).first().click();
   await page.waitForTimeout(400);
   const opened = await page.evaluate(() => window.__opened.at(-1) ?? null);

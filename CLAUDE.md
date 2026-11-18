@@ -84,6 +84,45 @@ Screens:
    chip row that doubles as a category filter, "show the whole region"
    button, native callout (name + category → Details) plus a preview card.
 
+### Run 4 features — built
+
+1. **Get directions** — button on Details (under the address) and on the
+   tour's completion step ("You've toured it virtually — visit it in
+   person"). `openDirections()` in `src/lib/device.ts` opens the Google Maps
+   universal link `https://www.google.com/maps/dir/?api=1&destination=<lat>,<lng>`
+   (built by `directionsUrl()` in `src/lib/outbound.ts`); Android falls back
+   to a `geo:` link, then a toast. No API key.
+2. **Near me** — `LocationContext` (`useUserLocation()`), expo-location,
+   foreground only. Never asks on launch: Explore shows `NearMePrompt` ("See
+   what is near you" → Allow location / Not now, remembered) and the "Nearest
+   first" chip also asks. Refused, or no fix at all → status `denied` and the
+   whole feature hides. Distances: haversine in `src/lib/geo.ts`
+   ("12.4 km away", "280 m away"), on `DestinationCard` and Details
+   ("· straight-line distance"). Summaries now carry `latitude`/`longitude`.
+3. **Favorites** — table `favorites` (see Database), `favoritesRepository`,
+   `FavoritesContext` (`useFavorites()`): one shared set for every heart,
+   optimistic toggle with rollback + toast on failure (`mergeFavoriteChanges()`
+   in `src/lib/favorites.ts`). `<FavoriteButton>` on cards (over the photo) and
+   in the Details top bar; a Favorites section on the Progress tab. Included in
+   the guest → account transfer (`transferProgress`).
+4. **Share** — share icon in the Details top bar → `shareDestination()`:
+   name, one-line description (`oneLineSummary()`), "Town • Province".
+5. **Offline** — `src/lib/offlineCache.ts` (pure, store injected) bound to
+   AsyncStorage in `src/lib/appCache.ts`. The catalogue (full summary list),
+   each fetched destination and its photo rows are saved on every successful
+   read; an offline error is answered from the saved copy, and filtered
+   Explore queries are re-filtered locally (`filterSummaries()`).
+   `<OfflineBanner>` ("Offline — showing saved data" + Retry) on Home,
+   Explore, Map and Details. Photos rely on expo-image's disk cache. Writes
+   are not queued.
+6. **Haptics** — `tapFeedback()` (quiz answer, favorite toggle) and
+   `successFeedback()` (quiz finished, Mark as Visited), no-ops on web.
+7. **Onboarding** — `src/app/onboarding.tsx`, 3 slides, Skip / Next / Get
+   started, flag `vtour.onboardingSeen`. Lives in `IdentityContext`
+   (`needsOnboarding`, `finishOnboarding`) so it loads before the splash hides.
+   Shown only on a true first launch (no session, no guest choice); existing
+   users are marked as having seen it.
+
 ### Identity model ("user key")
 
 No schema change: the text column `device_id` on `quiz_attempts` and
@@ -108,10 +147,11 @@ choice is remembered, so guests are not shown Welcome on every launch.
   Tour and Quiz. The stack uses `Stack.Protected` with `redirectTo`: without
   a session or a guest choice only Welcome (+ Sign In / Sign Up) is
   reachable. Typed routes and the React Compiler are on.
-- **@react-native-async-storage/async-storage** (session + device id),
-  **react-native-maps** (Map tab), **react-native-svg** (progress ring),
-  **expo-crypto** (device UUID), **react-native-reanimated** (step
-  transitions) — all included in Expo Go.
+- **@react-native-async-storage/async-storage** (session + device id +
+  offline cache), **react-native-maps** (Map tab), **react-native-svg**
+  (progress ring), **expo-crypto** (device UUID), **react-native-reanimated**
+  (step transitions), **expo-location** (Near me), **expo-haptics** — all
+  included in Expo Go.
 - **react-native-paper** (Material Design 3) with the custom theme below.
 - **@supabase/supabase-js** for all data.
 - **expo-image** for all image rendering; **expo-image-picker** +
@@ -168,6 +208,7 @@ Two files together define everything in the database:
 | `quiz_options` | `question_id` → cascade, `option_text`, `is_correct`. There is **no order column** — shuffle options in the app when showing a quiz. |
 | `quiz_attempts` | `destination_id` → cascade, `device_id` (the user key), `score`, `total`, `taken_at`. One row per finished attempt. |
 | `destination_completions` | `destination_id` → cascade, `device_id` (the user key), `completed_at`, unique `(destination_id, device_id)` — so "Mark as Visited" is idempotent per user. |
+| `favorites` (Run 4) | `destination_id` → cascade, `device_id` (the user key), `created_at`, unique `(destination_id, device_id)`. Same permissive anon + authenticated policies. Added to the live DB by `supabase/migrations/20261118_favorites.sql` — no reset. |
 
 - **Categories**: Historical Site · Church & Religious · Museum & Art ·
   Natural Wonder · Heritage Town & Culture.
@@ -298,12 +339,15 @@ the direct host is IPv6-only and does not.
 | Command | What it does |
 | --- | --- |
 | `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
+| `npm run db:migrate` | Runs every file in `supabase/migrations/` (idempotent, one transaction each) against the live DB, and fails if existing destination / attempt / visit counts change. Use this — not `db:setup` — for additive schema changes. |
+| `npm run db:sync-photos` | **Non-destructive photo top-up**: uploads the processed photos and updates only `cover_image_url` and the `destination_images` URLs / captions by stable id. Use it after replacing photos so live progress and favorites survive (unlike `db:seed`). |
+| `npm run secrets:check` | Secret scan before any push: `.env` ignored and never committed; DB password (raw / URL-encoded), `sb_secret`, credentialed connection strings and Google keys absent from every tracked file and every commit. Prints counts only. |
 | `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
 | `npm run db:verify` | Read-only check: 6 tables with RLS, exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
 | `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Cleans up after itself. |
 | `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
 | `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
-| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59 checks. Cleans up its rows and test user. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94 (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
 | `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
 | `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
@@ -336,17 +380,18 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
 - **Repository pattern.** Screens and components never call supabase-js.
   - `src/lib/supabase.ts` — the one client.
   - `src/repositories/destinations.ts`, `destinationImages.ts`, `quiz.ts`,
-    `progress.ts`, `auth.ts` — factories that take a client, so Node scripts
+    `progress.ts`, `favorites.ts`, `auth.ts` — factories that take a client, so Node scripts
     can reuse them. Keep them (and `src/lib/destinationForm.ts`, `featured.ts`,
     `base64.ts`, `errors.ts`, `quiz.ts`, `progress.ts`, `authForm.ts`,
-    `mapRegion.ts`, `format.ts`, `src/constants/taxonomy.ts`) free of React
-    Native imports — the unit tests and live scripts load them in Node.
+    `mapRegion.ts`, `format.ts`, `geo.ts`, `favorites.ts`, `offlineCache.ts`,
+    `outbound.ts`, `src/constants/taxonomy.ts`) free of React Native imports — the unit tests and live scripts load them in Node.
   - **Progress is always keyed by `useIdentity().userKey`**; never read or
     write progress rows with any other id.
   - `src/repositories/index.ts` — binds the factories to the app client.
     Import repositories from `@/repositories`.
 - **Lists use summaries.** `destinationsRepository.list()` returns
-  `DestinationSummary` rows (id, name, municipality, province, category, cover)
+  `DestinationSummary` rows (id, name, municipality, province, category, cover,
+  latitude, longitude)
   — never the long texts. Only `getById()` loads a full `Destination`. Cards
   take a `DestinationSummary`.
 - **Featured is derived, not stored.** There is no "featured" column.
@@ -372,7 +417,10 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
   plain-language message; show them with `<ErrorState>` or a toast.
 - **State** — `ExploreFiltersContext` (search + filters, shared by Home and
   Explore), `DataSyncContext`, `ToastContext`, `IdentityContext` (session,
-  user key, auth actions). Nothing heavier.
+  user key, auth actions, onboarding flag), `LocationContext` (Near me),
+  `FavoritesContext` (hearts). Nothing heavier. A favorite toggle reloads the
+  favorites query only (not `notifyChanged()`), since every heart reads the
+  same context.
 - **Imports** use the `@/` alias for `src/`.
 
 Folder layout:
@@ -387,11 +435,12 @@ src/
   components/          Shared UI; form/ (the form), auth/ (auth fields),
                        map/ (native + .web map, preview, legend)
   constants/           taxonomy.ts
-  context/             DataSync, ExploreFilters, Toast, Identity
+  context/             DataSync, ExploreFilters, Toast, Identity, Location, Favorites
   hooks/               useAsyncData, useDestinations, useProgress, useDebouncedValue
   lib/                 supabase, errors, destinationForm, featured, coverPhoto, base64,
-                       format, quiz, progress, authForm, mapRegion, localPrefs
-  repositories/        Data access (destinations, destinationImages, quiz, progress, auth)
+                       format, quiz, progress, authForm, mapRegion, localPrefs,
+                       geo, favorites, offlineCache + appCache, outbound, device
+  repositories/        Data access (destinations, destinationImages, quiz, progress, favorites, auth)
   theme/               Design tokens + Paper, navigation and Google Maps themes
   types/               database.ts
 tests/                 Unit tests (npm test)
@@ -400,7 +449,9 @@ data/
   destinations-seed.json   The content (single source of truth)
   images/<slug>/           cover.jpg, gallery-1.jpg, gallery-2.jpg (committed)
   IMAGE_CREDITS.md         Generated list of photo authors and licences
-supabase/schema.sql    Structure only
+supabase/schema.sql    Structure only (+ supabase/migrations/ for additive changes)
+docs/screenshots/      README screenshots (from the web click-through)
+eas.json               EAS profiles ("preview" = APK)
 scripts/
   db-setup.js              schema + seed + verify
   seed-full-dataset.js     the seeder
@@ -454,6 +505,17 @@ assets/                Icons, splash emblem (sources in assets/brand)
   output (`src/lib/base64.ts`) — no extra native module.
 - Tabs stay mounted. Only the focused screen should render a `<StatusBar>`
   (guard it with `useIsFocused()`).
+- Typed routes: a new route file is not known to `tsc` until the route types
+  regenerate — run `npx expo start` briefly (`expo export` does not refresh
+  `.expo/types/router.d.ts`).
+- On web, `Share.share()` resolves to `undefined` (and rejects with
+  `AbortError` when cancelled) — never read `result.action` unguarded.
+- A Paper dialog duplicates button labels that also sit under its backdrop
+  (e.g. "Sign out"); the click-through's `clickActionable()` picks the one
+  that can really be clicked.
+- `db:seed` deletes and re-inserts every destination, which cascades away all
+  quiz attempts, visits and favorites. Never use it just to change photos —
+  use `db:sync-photos`.
 - `sharp` is a devDependency used only by the Node scripts. Never import it
   (or anything under `scripts/`) from `src/`.
 
@@ -508,20 +570,33 @@ Phase 2 (Run 3)
 - [x] Navigation: tabs Home / Explore / Map / Progress; Add is a FAB on Explore
 - [x] Unit tests (`npm test`), live progress checks (`db:test`), live auth checks (`auth:test`), web click-through script
 
-Next (Run 4)
+Run 4
 
-- [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (see Auth above)
-- [ ] Top up the 3 photo sets flagged in Run 2
-- [ ] Polish pass on a real phone (insets, map pin legibility, transitions)
-- [ ] EAS APK with `GOOGLE_MAPS_ANDROID_API_KEY`
-- [ ] Portfolio README (screenshots, architecture, decisions)
+- [x] Get directions (Details + tour completion), Near me (distances + Nearest first), favorites, share, offline catalogue, haptics, onboarding
+- [x] `favorites` table applied live with an additive migration (`db:migrate`)
+- [x] Photo top-up: Pagsanjan Falls cover + gallery-2 replaced; Caleruega and Kamay ni Hesus re-searched, no better licensed image, sets kept
+- [x] QA: 44 unit, 38 db:test, 6 auth:test, 94 web click-through, tsc, lint, expo-doctor 20/20, Android Hermes export
+- [x] Public GitHub repo `clarkdesepida0154/virtual-tour-calabarzon` after a clean secret scan; `.gitattributes`
+- [x] Portfolio README with 8 screenshots (`docs/screenshots/`)
+- [x] Device check by the owner on Android and iOS (Runs 1–3 features)
+- [ ] EAS APK (`eas.json` preview profile, `android.package` com.clark0154.virtualtour) — see the Run 4 report for status
+- [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (still ON at the end of Run 4)
+- [ ] Owner: restrict the Google Maps key to the package name + the EAS keystore SHA-1
+
+Next (Run 5)
+
+- [ ] Documentation, wireframes, web demo deploy
 
 ## Not yet verified on a device
 
-The app was checked with `tsc`, ESLint, the unit tests, an Android export
-(Hermes bundle), the live database and auth scripts, and a 59-step headless
-click-through of the web build. It has **not** been run on a physical Android
-phone by the agent. The parts that only a phone can confirm:
+The owner verified the Run 1–3 features on physical Android and iOS phones
+(no issues). The **Run 4 features** were checked with tsc, ESLint, unit
+tests, an Android Hermes export, the live scripts and a 94-step web
+click-through — not yet on a phone. Phone-only parts of Run 4: the system
+location dialog and real GPS distances, haptics, the Google Maps app hand-off,
+the native share sheet, offline behaviour with airplane mode (including
+expo-image's photo cache), and the onboarding swipe. The older phone-only
+list, for reference:
 
 - the photo picker and upload, keyboard avoidance in the forms (Add / Edit,
   Sign In / Sign Up), status-bar / navigation-bar insets;

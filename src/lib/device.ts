@@ -62,9 +62,14 @@ export async function shareDestination(
 ): Promise<ShareOutcome> {
   const content = buildShareContent(destination);
   try {
-    const result = await Share.share(content, { dialogTitle: `Share ${destination.name}` });
-    return result.action === Share.dismissedAction ? 'dismissed' : 'shared';
-  } catch {
+    // On web this resolves to `undefined` (the Web Share API returns nothing).
+    const result: { action?: string } | undefined = await Share.share(content, {
+      dialogTitle: `Share ${destination.name}`,
+    });
+    return result?.action === Share.dismissedAction ? 'dismissed' : 'shared';
+  } catch (error) {
+    // A person closing the browser's share sheet is not a failure.
+    if (error instanceof Error && error.name === 'AbortError') return 'dismissed';
     // e.g. a desktop browser without the Web Share API.
     return 'unavailable';
   }
