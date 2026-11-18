@@ -526,6 +526,24 @@ assets/                Icons, splash emblem (sources in assets/brand)
   sensitive) and `GOOGLE_MAPS_ANDROID_API_KEY` (secret) are EAS environment
   variables for `preview` and `production`. `app.config.js` fails an EAS
   Android build that lacks the Maps key.
+- **Release builds: R8 is OFF on purpose** (Run 4.1). The SDK 58 template
+  enables R8 with `proguard-android-optimize` by default, and v1.0.0 crashed at
+  launch on a device: `androidx.startup.InitializationProvider` →
+  `WorkManagerInitializer` → "Failed to create an instance of class
+  androidx.work.impl.WorkDatabase". WorkManager is pulled in by
+  **react-native-maps** (`androidx.work:work-runtime` 2.9.1, for its URL-tile
+  worker); it builds its Room database by reflection, which R8 broke.
+  `expo-build-properties` in app.json now sets `enableMinifyInReleaseBuilds`
+  and `enableShrinkResourcesInReleaseBuilds` to false and appends keep rules
+  (androidx.work, androidx.startup initializers, Room `_Impl`, rnmaps, Expo
+  modules) so re-enabling R8 later starts from a safer base — but only re-enable
+  it after testing the release APK on a real phone. Expo Go never shows this
+  class of bug: test every standalone build on a device.
+- App version lives in app.json (`version`, `android.versionCode`):
+  `eas.json` uses `appVersionSource: "local"`. Bump both for each APK.
+- `npx expo prebuild` (useful to inspect the generated Gradle files) rewrites
+  the `android` / `ios` npm scripts to `expo run:*` — restore them to
+  `expo start --android/--ios`, and delete the generated `android/`.
 - `eas credentials` is interactive only. The keystore fingerprints come from
   the Expo GraphQL API (`androidAppBuildCredentialsList → androidKeystore →
   sha1CertificateFingerprint`); the APK is v2-signed only, so JRE 8's
@@ -594,6 +612,7 @@ Run 4
 - [x] Portfolio README with 8 screenshots (`docs/screenshots/`)
 - [x] Device check by the owner on Android and iOS (Runs 1–3 features)
 - [x] EAS APK v1.0.0 (preview profile, `com.clark0154.virtualtour`, EAS-managed keystore SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`) attached to GitHub Release v1.0.0
+- [x] Run 4.1: v1.0.0 launch crash fixed (R8 off + keep rules) → v1.0.1 (versionCode 2) on GitHub Releases
 - [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (still ON at the end of Run 4)
 - [ ] Owner: restrict the Google Maps key to the package name + the EAS keystore SHA-1
 
