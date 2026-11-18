@@ -170,6 +170,10 @@ export const layout = {
   fabClearance: 96,
   /** Province completion bars on the Progress tab. */
   meterHeight: 8,
+  /** The framed plate on each onboarding slide. */
+  onboardingPlate: 184,
+  /** Gold ring drawn just inside the onboarding plate. */
+  onboardingRingInset: 12,
 } as const;
 
 export const motion = {

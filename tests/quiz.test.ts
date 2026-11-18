@@ -180,9 +180,9 @@ describe('best scores', () => {
 
 describe('summarizeProgress', () => {
   const destinations: DestinationSummary[] = [
-    { id: 'a', name: 'Alpha', municipality: 'X', province: 'Cavite', category: 'Historical Site', cover_image_url: null },
-    { id: 'b', name: 'Beta', municipality: 'Y', province: 'Cavite', category: 'Natural Wonder', cover_image_url: null },
-    { id: 'c', name: 'Gamma', municipality: 'Z', province: 'Quezon', category: 'Museum & Art', cover_image_url: null },
+    { id: 'a', name: 'Alpha', municipality: 'X', province: 'Cavite', category: 'Historical Site', cover_image_url: null, latitude: null, longitude: null },
+    { id: 'b', name: 'Beta', municipality: 'Y', province: 'Cavite', category: 'Natural Wonder', cover_image_url: null, latitude: null, longitude: null },
+    { id: 'c', name: 'Gamma', municipality: 'Z', province: 'Quezon', category: 'Museum & Art', cover_image_url: null, latitude: null, longitude: null },
   ];
 
   it('is empty before any activity', () => {

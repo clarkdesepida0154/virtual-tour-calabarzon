@@ -14,17 +14,22 @@ import { AppText } from '@/components/AppText';
 import { BestScoreBadge, VisitedBadge } from '@/components/Badges';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CoverImage } from '@/components/CoverImage';
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { DetailsBodySkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag, ProvinceTag } from '@/components/Tag';
 import { MapPreview } from '@/components/map/MapPreview';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { useDataSync } from '@/context/DataSyncContext';
+import { useUserLocation } from '@/context/LocationContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { useDestinationProgress } from '@/hooks/useProgress';
+import { openDirections, shareDestination } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
+import { distanceFrom, formatDistance } from '@/lib/geo';
 import { hasCoordinates } from '@/lib/mapRegion';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
 import { colors, elevation, iconSize, layout, radius, spacing } from '@/theme';
@@ -48,6 +53,7 @@ export default function DestinationDetailsScreen() {
   const images = useDestinationImages(id);
   // Has the current user toured this place, and how did their quizzes go?
   const progress = useDestinationProgress(id);
+  const location = useUserLocation();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -136,6 +142,19 @@ export default function DestinationDetailsScreen() {
   }
 
   const coordinates = destination ? formatCoordinates(destination) : null;
+  const km = destination && location.isAvailable ? distanceFrom(location.position, destination) : null;
+
+  const getDirections = async () => {
+    if (!destination) return;
+    const opened = await openDirections(destination);
+    if (!opened) showToast('We couldn’t open Google Maps on this device.');
+  };
+
+  const share = async () => {
+    if (!destination) return;
+    const outcome = await shareDestination(destination);
+    if (outcome === 'unavailable') showToast('Sharing isn’t available on this device.');
+  };
   // Freely licensed photos must be credited; show the cover's credit if we have one.
   const coverCredit =
     (destination &&
@@ -181,6 +200,8 @@ export default function DestinationDetailsScreen() {
               </AppText>
               <View style={styles.rule} />
 
+              <OfflineBanner />
+
               {progress.data && (progress.data.visited || progress.data.best) ? (
                 <View style={styles.tags}>
                   {progress.data.visited ? <VisitedBadge /> : null}
@@ -200,6 +221,18 @@ export default function DestinationDetailsScreen() {
                     {destination.address}
                   </AppText>
                 </View>
+                {km !== null ? (
+                  <View style={styles.fact}>
+                    <AppIcon name="navigation-variant-outline" size="md" color="secondaryDark" />
+                    <AppText
+                      variant="label"
+                      color="secondaryDark"
+                      style={styles.flex}
+                      accessibilityLabel={`${formatDistance(km)} in a straight line from where you are`}>
+                      {formatDistance(km)} · straight-line distance
+                    </AppText>
+                  </View>
+                ) : null}
                 {coordinates ? (
                   <View style={styles.fact}>
                     <AppIcon name="crosshairs-gps" size="md" color="muted" />
@@ -213,6 +246,17 @@ export default function DestinationDetailsScreen() {
                   </View>
                 ) : null}
               </View>
+
+              {hasCoordinates(destination) ? (
+                <AppButton
+                  label="Get directions"
+                  icon="directions"
+                  variant="secondary"
+                  onPress={() => void getDirections()}
+                  accessibilityHint="Opens Google Maps with directions from where you are"
+                  style={styles.directions}
+                />
+              ) : null}
 
               <AppText variant="bodyLarge" color="ink">
                 {destination.description}
@@ -331,6 +375,25 @@ export default function DestinationDetailsScreen() {
             {destination?.name ?? ''}
           </AppText>
         </Animated.View>
+        {destination ? (
+          <View style={styles.topActions}>
+            <FavoriteButton
+              destinationId={destination.id}
+              name={destination.name}
+              style={styles.roundButton}
+            />
+            <IconButton
+              icon="share-variant-outline"
+              mode="contained"
+              size={iconSize.md}
+              containerColor={colors.surface}
+              iconColor={colors.ink}
+              onPress={() => void share()}
+              accessibilityLabel={`Share ${destination.name}`}
+              style={styles.roundButton}
+            />
+          </View>
+        ) : null}
       </View>
 
       {/* The two ways to learn about this place */}
@@ -588,7 +651,14 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     flex: 1,
-    paddingRight: spacing.lg,
+    paddingRight: spacing.sm,
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  directions: {
+    alignSelf: 'flex-start',
   },
   roundButton: {
     ...elevation.card,

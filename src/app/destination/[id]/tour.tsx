@@ -29,8 +29,10 @@ import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { useDestinationProgress } from '@/hooks/useProgress';
+import { openDirections, successFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatDate, formatPlace, splitLead } from '@/lib/format';
+import { hasCoordinates } from '@/lib/mapRegion';
 import { progressRepository } from '@/repositories';
 import { colors, iconSize, layout, motion, radius, spacing } from '@/theme';
 import type { Destination, DestinationImage } from '@/types/database';
@@ -477,6 +479,7 @@ function CompletionStep({
     try {
       const row = await progressRepository.markVisited(userKey, destination.id);
       setJustVisitedAt(row.completed_at ?? new Date().toISOString());
+      successFeedback();
       notifyChanged();
     } catch (cause) {
       showToast(toAppError(cause, 'We couldn’t mark this destination as visited.').message);
@@ -487,6 +490,10 @@ function CompletionStep({
 
   const takeQuiz = () =>
     router.replace({ pathname: '/destination/[id]/quiz', params: { id: destination.id } });
+
+  const getDirections = async () => {
+    if (!(await openDirections(destination))) showToast('We couldn’t open Google Maps on this device.');
+  };
 
   return (
     <ScrollView
@@ -551,6 +558,27 @@ function CompletionStep({
         />
         <AppButton label="Back to the destination" variant="text" onPress={onClose} disabled={saving} />
       </View>
+
+      {hasCoordinates(destination) ? (
+        <View style={styles.visitCard}>
+          <AppIcon name="directions" size="lg" color="primary" />
+          <View style={styles.flex}>
+            <AppText variant="subtitle">You’ve toured it virtually — visit it in person</AppText>
+            <AppText variant="caption" color="inkSoft">
+              Google Maps will plan the trip from where you are now.
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+      {hasCoordinates(destination) ? (
+        <AppButton
+          label="Get directions"
+          icon="directions"
+          variant="secondary"
+          onPress={() => void getDirections()}
+          accessibilityHint="Opens Google Maps with directions from where you are"
+        />
+      ) : null}
     </ScrollView>
   );
 }
@@ -831,5 +859,16 @@ const styles = StyleSheet.create({
   completeActions: {
     gap: spacing.md,
     marginTop: spacing.lg,
+  },
+  visitCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginTop: spacing.xl,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: layout.hairline,
+    borderColor: colors.outline,
   },
 });

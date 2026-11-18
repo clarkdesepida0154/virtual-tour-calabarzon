@@ -29,7 +29,10 @@ import {
   storagePathFromPublicUrl,
 } from '../src/repositories/destinationImages.ts';
 import { buildSearchFilter, createDestinationsRepository } from '../src/repositories/destinations.ts';
+import { createFavoritesRepository } from '../src/repositories/favorites.ts';
 import { createProgressRepository } from '../src/repositories/progress.ts';
+import { favoriteDestinations } from '../src/lib/favorites.ts';
+import { distanceFrom, sortByDistance } from '../src/lib/geo.ts';
 import { createQuizRepository } from '../src/repositories/quiz.ts';
 import { bestScoresByDestination, summarizeProgress } from '../src/lib/progress.ts';
 import { prepareQuiz, scoreQuiz } from '../src/lib/quiz.ts';
@@ -67,6 +70,7 @@ const destinations = createDestinationsRepository(client);
 const images = createDestinationImagesRepository(client);
 const quiz = createQuizRepository(client);
 const progress = createProgressRepository(client);
+const favorites = createFavoritesRepository(client);
 
 /** Throwaway "user key" for the progress checks; every row it writes is removed. */
 const TEST_USER_KEY = `verify-crud-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -148,6 +152,16 @@ async function main() {
     expect(sameList(names(all), sorted), 'not sorted by name');
     expect(!('history' in all[0]) && !('description' in all[0]), 'list rows should not carry the long texts');
     expect(all.every((row) => row.id && row.name && row.province && row.category), 'summary fields missing');
+  });
+
+  await check('summaries carry coordinates for Near me; nearest-first sort from Calamba works', async () => {
+    const placed = all.filter((row) => typeof row.latitude === 'number' && typeof row.longitude === 'number');
+    expect(placed.length >= expected.length, `only ${placed.length} summaries have coordinates`);
+    const calamba = { latitude: 14.2117, longitude: 121.1653 };
+    const nearest = sortByDistance(all, calamba);
+    expect(nearest[0].name === 'Rizal Shrine', `nearest to Calamba is ${nearest[0].name}`);
+    const km = nearest.map((row) => distanceFrom(calamba, row)).filter((value) => value !== null);
+    expect(km.every((value, index) => index === 0 || value >= km[index - 1]), 'not sorted by distance');
   });
 
   await check('getById() returns the full text; unknown and malformed ids return null', async () => {
@@ -510,22 +524,73 @@ async function main() {
     expect(summary.journey.length === 2, `journey has ${summary.journey.length} entries`);
   });
 
-  await check('transferProgress() moves guest rows onto an account, without duplicate visits', async () => {
+  // --- Run 4: favorites, under the same throwaway user keys ---
+  await check('favorites: add is idempotent, list is newest first, remove works', async () => {
+    await favorites.add(TEST_USER_KEY, first.id);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await favorites.add(TEST_USER_KEY, second.id);
+    await favorites.add(TEST_USER_KEY, second.id); // again: no error, no duplicate
+    let rows = await favorites.list(TEST_USER_KEY);
+    expect(rows.length === 2, `expected 2 favorites, got ${rows.length}`);
+    expect(rows[0].destination_id === second.id, 'not newest first');
+    expect(rows.every((row) => row.device_id === TEST_USER_KEY), 'wrong user key on a row');
+    const shown = favoriteDestinations(all, rows).map((row) => row.id);
+    expect(sameList(shown, [second.id, first.id]), 'Progress tab list wrong');
+    await favorites.remove(TEST_USER_KEY, second.id);
+    await favorites.remove(TEST_USER_KEY, second.id); // removing twice is fine
+    rows = await favorites.list(TEST_USER_KEY);
+    expect(rows.length === 1 && rows[0].destination_id === first.id, 'remove failed');
+  });
+
+  await check('favorites are isolated per user key, and unique per (destination, key) in the database', async () => {
+    expect((await favorites.list(TEST_GUEST_KEY)).length === 0, 'another key sees favorites');
+    const { error } = await client.from('favorites').insert({ device_id: TEST_USER_KEY, destination_id: first.id });
+    expect(error?.code === '23505', `duplicate insert not rejected (got ${error?.code ?? 'no error'})`);
+  });
+
+  await check('favorites cascade away when their destination is deleted', async () => {
+    const temp = await destinations.create(
+      toDestinationInput(
+        {
+          ...EMPTY_FORM_VALUES,
+          name: `${MARKER} Favorite cascade`,
+          description: 'Temporary row created by scripts/verify-crud.mjs.',
+          address: 'Pila, Laguna',
+          province: 'Laguna',
+          category: 'Heritage Town & Culture',
+        },
+        null,
+      ),
+    );
+    await favorites.add(TEST_GUEST_KEY, temp.id);
+    expect((await favorites.list(TEST_GUEST_KEY)).length === 1, 'favorite not saved');
+    await destinations.remove(temp.id);
+    expect((await favorites.list(TEST_GUEST_KEY)).length === 0, 'favorite survived its destination');
+  });
+
+  await check('transferProgress() moves guest visits, attempts and favorites onto an account, without duplicates', async () => {
     await progress.markVisited(TEST_GUEST_KEY, first.id); // also visited by the account: dropped
     await progress.markVisited(TEST_GUEST_KEY, second.id); // new for the account: moved
     await progress.recordAttempt({ userKey: TEST_GUEST_KEY, destinationId: second.id, score: 1, total: 5 });
+    await favorites.add(TEST_GUEST_KEY, first.id); // the account has this favorite already: dropped
+    await favorites.add(TEST_GUEST_KEY, second.id); // new for the account: moved
     await progress.transferProgress(TEST_GUEST_KEY, TEST_USER_KEY);
     expect((await progress.listCompletions(TEST_GUEST_KEY)).length === 0, 'guest visits left behind');
     expect((await progress.listAttempts(TEST_GUEST_KEY)).length === 0, 'guest attempts left behind');
+    expect((await favorites.list(TEST_GUEST_KEY)).length === 0, 'guest favorites left behind');
     expect((await progress.listCompletions(TEST_USER_KEY)).length === 2, 'account should now have 2 visits');
     expect((await progress.listAttempts(TEST_USER_KEY)).length === 5, 'account should now have 5 attempts');
+    const accountFavorites = (await favorites.list(TEST_USER_KEY)).map((row) => row.destination_id).sort();
+    expect(sameList(accountFavorites, [first.id, second.id].sort()), `account favorites: ${accountFavorites}`);
   });
 
-  await check('removeAllFor() clears every row of the test user key', async () => {
+  await check('removeAllFor() clears every row (and favorite) of the test user keys', async () => {
     await progress.removeAllFor(TEST_USER_KEY);
     await progress.removeAllFor(TEST_GUEST_KEY);
     expect((await progress.listCompletions(TEST_USER_KEY)).length === 0, 'completions remain');
     expect((await progress.listAttempts(TEST_USER_KEY)).length === 0, 'attempts remain');
+    expect((await favorites.list(TEST_USER_KEY)).length === 0, 'favorites remain');
+    expect((await favorites.list(TEST_GUEST_KEY)).length === 0, 'guest favorites remain');
   });
 
   // --- clean-up, even after failures ---

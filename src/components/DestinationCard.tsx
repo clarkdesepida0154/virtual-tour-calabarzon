@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { CoverImage } from '@/components/CoverImage';
+import { FavoriteButton } from '@/components/FavoriteButton';
 import { CategoryTag } from '@/components/Tag';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { formatPlace } from '@/lib/format';
@@ -15,15 +16,23 @@ type Props = {
   onPress: (destination: DestinationSummary) => void;
 };
 
-/** Explore list card: photo, category tag, serif name, and where it is. */
-export function DestinationCard({ destination, onPress }: Props) {
+type CardProps = Props & {
+  /** "12.4 km away" — shown only when the user's location is known. */
+  distance?: string | null;
+};
+
+/**
+ * Explore list card: photo with a favorite heart, category tag, serif name,
+ * where it is, and (with Near me) how far away.
+ */
+export function DestinationCard({ destination, onPress, distance }: CardProps) {
   const place = formatPlace(destination);
 
   return (
     <Pressable
       onPress={() => onPress(destination)}
       accessibilityRole="button"
-      accessibilityLabel={`${destination.name}, ${destination.category}, ${place}`}
+      accessibilityLabel={`${destination.name}, ${destination.category}, ${place}${distance ? `, ${distance}` : ''}`}
       accessibilityHint="Opens the destination details"
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.clip}>
@@ -36,6 +45,12 @@ export function DestinationCard({ destination, onPress }: Props) {
           <View style={styles.tag}>
             <CategoryTag category={destination.category} tone="overlay" />
           </View>
+          <FavoriteButton
+            destinationId={destination.id}
+            name={destination.name}
+            size="sm"
+            style={styles.heart}
+          />
         </View>
         <View style={styles.body}>
           <AppText variant="cardTitle" numberOfLines={3}>
@@ -47,6 +62,14 @@ export function DestinationCard({ destination, onPress }: Props) {
               {place}
             </AppText>
           </View>
+          {distance ? (
+            <View style={styles.place}>
+              <AppIcon name="navigation-variant-outline" size="sm" color="secondaryDark" />
+              <AppText variant="label" color="secondaryDark" numberOfLines={1} style={styles.placeText}>
+                {distance}
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -114,6 +137,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.md,
     bottom: spacing.md,
+  },
+  heart: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    ...elevation.card,
   },
   body: {
     padding: spacing.lg,

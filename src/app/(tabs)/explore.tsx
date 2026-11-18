@@ -1,12 +1,15 @@
 import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
 
 import { AppText } from '@/components/AppText';
 import { DestinationCard } from '@/components/DestinationCard';
-import { FilterChipRow } from '@/components/FilterChips';
+import { FilterChip, FilterChipRow } from '@/components/FilterChips';
 import type { FilterOption } from '@/components/FilterChips';
 import { LinearProgress } from '@/components/LinearProgress';
+import { NearMePrompt } from '@/components/NearMePrompt';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SearchField } from '@/components/SearchField';
 import { DestinationCardSkeleton } from '@/components/Skeleton';
@@ -14,9 +17,11 @@ import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CATEGORIES, CATEGORY_META, PROVINCES, REGION_LABEL } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
 import { useExploreFilters } from '@/context/ExploreFiltersContext';
+import { useUserLocation } from '@/context/LocationContext';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDestinations } from '@/hooks/useDestinations';
 import { pluralize } from '@/lib/format';
+import { distanceFrom, formatDistance, sortByDistance } from '@/lib/geo';
 import { colors, layout, motion, radius, spacing } from '@/theme';
 import type { DestinationSummary } from '@/types/database';
 
@@ -46,8 +51,27 @@ export default function ExploreScreen() {
     province: filters.province,
   });
 
-  const destinations = list.data ?? [];
+  // Near me: distances on every card, and an optional "Nearest first" order.
+  const location = useUserLocation();
+  const [nearestFirst, setNearestFirst] = useState(false);
+  const origin = location.isAvailable ? location.position : null;
+  const sortNearest = nearestFirst && origin !== null;
+
+  const destinations = useMemo(() => {
+    const rows = list.data ?? [];
+    return sortNearest && origin ? sortByDistance(rows, origin) : rows;
+  }, [list.data, sortNearest, origin]);
   const isUpdating = list.status === 'success' && (list.isFetching || filters.query !== debouncedQuery);
+
+  const toggleNearest = async () => {
+    if (nearestFirst) {
+      setNearestFirst(false);
+      return;
+    }
+    // Asking for "Nearest first" is a clear reason to ask for location.
+    if (location.status === 'undetermined' && !(await location.requestPermission())) return;
+    setNearestFirst(true);
+  };
 
   const openDestination = (destination: DestinationSummary) =>
     router.push({ pathname: '/destination/[id]', params: { id: destination.id } });
@@ -91,7 +115,16 @@ export default function ExploreScreen() {
         <FlatList
           data={destinations}
           keyExtractor={(destination) => destination.id}
-          renderItem={({ item }) => <DestinationCard destination={item} onPress={openDestination} />}
+          renderItem={({ item }) => {
+            const km = distanceFrom(origin, item);
+            return (
+              <DestinationCard
+                destination={item}
+                onPress={openDestination}
+                distance={km === null ? null : formatDistance(km)}
+              />
+            );
+          }}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -106,16 +139,28 @@ export default function ExploreScreen() {
             />
           }
           ListHeaderComponent={
-            destinations.length > 0 ? (
-              <View style={styles.summary}>
-                <AppText variant="label" color="inkSoft" style={styles.summaryText}>
-                  {activeCount > 0
-                    ? `${pluralize(destinations.length, 'match', 'matches')} for your filters`
-                    : pluralize(destinations.length, 'destination')}
-                </AppText>
-                {activeCount > 0 ? <ClearFiltersButton onPress={clearFilters} /> : null}
-              </View>
-            ) : undefined
+            <View style={styles.header}>
+              <OfflineBanner />
+              <NearMePrompt />
+              {destinations.length > 0 ? (
+                <View style={styles.summary}>
+                  <AppText variant="label" color="inkSoft" style={styles.summaryText}>
+                    {activeCount > 0
+                      ? `${pluralize(destinations.length, 'match', 'matches')} for your filters`
+                      : pluralize(destinations.length, 'destination')}
+                  </AppText>
+                  {activeCount > 0 ? <ClearFiltersButton onPress={clearFilters} /> : null}
+                  {location.isOffered ? (
+                    <FilterChip
+                      label="Nearest first"
+                      icon="crosshairs-gps"
+                      selected={sortNearest}
+                      onPress={() => void toggleNearest()}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
           }
           ListEmptyComponent={
             activeCount > 0 ? (
@@ -191,6 +236,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
+  },
+  header: {
+    gap: spacing.md,
   },
   summary: {
     flexDirection: 'row',

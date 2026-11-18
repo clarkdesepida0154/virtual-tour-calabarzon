@@ -10,18 +10,23 @@ import { AppText } from '@/components/AppText';
 import { Badge, BestScoreBadge, Meter, VisitedBadge } from '@/components/Badges';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CoverImage } from '@/components/CoverImage';
+import { FavoriteButton } from '@/components/FavoriteButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Skeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { PROVINCE_META } from '@/constants/taxonomy';
+import { useFavorites } from '@/context/FavoritesContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
+import { useDestinations } from '@/hooks/useDestinations';
 import { useProgressSummary } from '@/hooks/useProgress';
+import { favoriteDestinations } from '@/lib/favorites';
 import { toAppError } from '@/lib/errors';
 import { formatPlace } from '@/lib/format';
 import type { DestinationProgress, ProgressSummary } from '@/lib/progress';
+import type { DestinationSummary } from '@/types/database';
 import { colors, elevation, layout, radius, spacing } from '@/theme';
 
 export default function ProgressScreen() {
@@ -201,6 +206,8 @@ function ProgressBody({
         </View>
       </View>
 
+      <FavoritesSection onOpen={onOpen} onExplore={onExplore} />
+
       {/* Provinces */}
       <SectionHeader inset={false} title="By province" subtitle="Visited destinations in each of the five provinces" />
       <View style={styles.card}>
@@ -247,6 +254,72 @@ function ProgressBody({
         </View>
       )}
     </>
+  );
+}
+
+/** Places the user hearted, newest first. Unhearting here removes them at once. */
+function FavoritesSection({ onOpen, onExplore }: { onOpen: (id: string) => void; onExplore: () => void }) {
+  const favorites = useFavorites();
+  const catalogue = useDestinations({});
+  const saved = favoriteDestinations(catalogue.data ?? [], favorites.entries);
+  const isLoading = !favorites.isReady || catalogue.status === 'loading';
+
+  return (
+    <>
+      <SectionHeader
+        inset={false}
+        title="Favorites"
+        subtitle={
+          saved.length > 0
+            ? `${saved.length} saved ${saved.length === 1 ? 'place' : 'places'} for your next visit`
+            : 'Places you have saved with the heart'
+        }
+      />
+      {isLoading ? (
+        <Skeleton height={layout.iconBadge * 2 + spacing.xl} style={styles.skeletonCard} />
+      ) : saved.length === 0 ? (
+        <View style={styles.card}>
+          <EmptyState
+            icon="heart-outline"
+            title="No favorites yet"
+            message="Tap the heart on any destination to keep it here — a shortlist for your next real trip."
+            actionLabel="Find a destination"
+            actionIcon="compass-outline"
+            onAction={onExplore}
+          />
+        </View>
+      ) : (
+        <View style={styles.journey}>
+          {saved.map((destination) => (
+            <FavoriteRow key={destination.id} destination={destination} onPress={() => onOpen(destination.id)} />
+          ))}
+        </View>
+      )}
+    </>
+  );
+}
+
+function FavoriteRow({ destination, onPress }: { destination: DestinationSummary; onPress: () => void }) {
+  return (
+    <View style={styles.row}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${destination.name}, ${formatPlace(destination)}`}
+        accessibilityHint="Opens the destination details"
+        style={({ pressed }) => [styles.favoriteMain, pressed && styles.pressed]}>
+        <CoverImage uri={destination.cover_image_url} label={`Photo of ${destination.name}`} style={styles.thumb} />
+        <View style={styles.rowBody}>
+          <AppText variant="cardTitleSmall" numberOfLines={2}>
+            {destination.name}
+          </AppText>
+          <AppText variant="caption" color="inkSoft" numberOfLines={1}>
+            {formatPlace(destination)}
+          </AppText>
+        </View>
+      </Pressable>
+      <FavoriteButton destinationId={destination.id} name={destination.name} tone="plain" />
+    </View>
   );
 }
 
@@ -441,6 +514,12 @@ const styles = StyleSheet.create({
   rowBody: {
     flex: 1,
     gap: spacing.xs,
+  },
+  favoriteMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   rowBadges: {
     flexDirection: 'row',

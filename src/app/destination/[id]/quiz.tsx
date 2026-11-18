@@ -30,6 +30,7 @@ import { useDataSync } from '@/context/DataSyncContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useDestination } from '@/hooks/useDestinations';
 import { useDestinationProgress, useQuiz } from '@/hooks/useProgress';
+import { successFeedback, tapFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import type { BestScore } from '@/lib/progress';
 import { isCorrectAnswer, prepareQuiz, resultMessage, resultTone, scoreQuiz } from '@/lib/quiz';
@@ -115,6 +116,7 @@ export default function QuizScreen() {
 
   const answer = (questionId: string, optionId: string) => {
     if (answers[questionId]) return;
+    tapFeedback();
     setAnswers((current) => ({ ...current, [questionId]: optionId }));
   };
 
@@ -124,6 +126,7 @@ export default function QuizScreen() {
       return;
     }
     const score = scoreQuiz(questions, answers);
+    successFeedback();
     setResult(score);
     setPhase('result');
     void save(score);

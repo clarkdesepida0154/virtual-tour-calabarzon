@@ -42,3 +42,36 @@ export async function writeGuestChosen(chosen: boolean): Promise<void> {
     // Not fatal: at worst the Welcome screen shows again next launch.
   }
 }
+
+// ---------------------------------------------------------------------------
+// Run 4: one-time flags
+// ---------------------------------------------------------------------------
+
+const ONBOARDING_SEEN_KEY = 'vtour.onboardingSeen';
+const LOCATION_PROMPT_DISMISSED_KEY = 'vtour.locationPromptDismissed';
+
+async function readFlag(key: string): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(key)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+async function writeFlag(key: string, on: boolean): Promise<void> {
+  try {
+    if (on) await AsyncStorage.setItem(key, 'true');
+    else await AsyncStorage.removeItem(key);
+  } catch {
+    // Not fatal: at worst the one-time screen or prompt shows again.
+  }
+}
+
+/** Whether the first-launch carousel has been seen (or skipped). */
+export const readOnboardingSeen = () => readFlag(ONBOARDING_SEEN_KEY);
+export const writeOnboardingSeen = (seen: boolean) => writeFlag(ONBOARDING_SEEN_KEY, seen);
+
+/** Whether the person tapped "Not now" on the Near me invitation. */
+export const readLocationPromptDismissed = () => readFlag(LOCATION_PROMPT_DISMISSED_KEY);
+export const writeLocationPromptDismissed = (dismissed: boolean) =>
+  writeFlag(LOCATION_PROMPT_DISMISSED_KEY, dismissed);

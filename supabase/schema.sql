@@ -19,6 +19,7 @@
 -- -----------------------------------------------------------------------------
 -- RESET (1/2): tables, their policies/triggers/indexes, and helper functions
 -- -----------------------------------------------------------------------------
+drop table if exists public.favorites cascade;
 drop table if exists public.destination_completions cascade;
 drop table if exists public.quiz_attempts cascade;
 drop table if exists public.quiz_options cascade;
@@ -118,6 +119,17 @@ create table public.destination_completions (
   unique (destination_id, device_id)
 );
 
+-- Run 4: saved ("hearted") destinations, keyed by the same user key.
+-- Applied to an existing database without a reset by
+-- supabase/migrations/20261118_favorites.sql (`npm run db:migrate`).
+create table public.favorites (
+  id             uuid primary key default gen_random_uuid(),
+  destination_id uuid not null references public.destinations (id) on delete cascade,
+  device_id      text not null,
+  created_at     timestamptz default now(),
+  unique (destination_id, device_id)
+);
+
 -- Indexes for the Explore filters and the foreign keys.
 create index destinations_province_idx on public.destinations (province);
 create index destinations_category_idx on public.destinations (category);
@@ -130,6 +142,7 @@ create index quiz_options_question_idx on public.quiz_options (question_id);
 create index quiz_attempts_device_idx on public.quiz_attempts (device_id, destination_id);
 create index destination_completions_device_idx
   on public.destination_completions (device_id);
+create index favorites_device_idx on public.favorites (device_id);
 
 -- Keep destinations.updated_at fresh on every edit.
 create function public.set_updated_at()
@@ -173,7 +186,8 @@ begin
     'quiz_questions',
     'quiz_options',
     'quiz_attempts',
-    'destination_completions'
+    'destination_completions',
+    'favorites'
   ]
   loop
     execute format('alter table public.%I enable row level security', t);

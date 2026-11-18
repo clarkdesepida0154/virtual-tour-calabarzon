@@ -14,7 +14,9 @@ import { PaperProvider } from 'react-native-paper';
 
 import { DataSyncProvider } from '@/context/DataSyncContext';
 import { ExploreFiltersProvider } from '@/context/ExploreFiltersContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { IdentityProvider, useIdentity } from '@/context/IdentityContext';
+import { LocationProvider } from '@/context/LocationContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { colors, navigationTheme, paperTheme } from '@/theme';
 
@@ -43,12 +45,16 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <DataSyncProvider>
           <IdentityProvider>
-            <ExploreFiltersProvider>
-              <ToastProvider>
-                <RootNavigator />
-                <StatusBar style="dark" />
-              </ToastProvider>
-            </ExploreFiltersProvider>
+            <LocationProvider>
+              <ExploreFiltersProvider>
+                <ToastProvider>
+                  <FavoritesProvider>
+                    <RootNavigator />
+                    <StatusBar style="dark" />
+                  </FavoritesProvider>
+                </ToastProvider>
+              </ExploreFiltersProvider>
+            </LocationProvider>
           </IdentityProvider>
         </DataSyncProvider>
       </ThemeProvider>
@@ -57,12 +63,15 @@ export default function RootLayout() {
 }
 
 /**
- * The root stack. Without a session and before "Continue as guest", only the
- * Welcome flow is reachable; afterwards the whole app is. Guests and
- * signed-in users see exactly the same features.
+ * The root stack. On a true first launch only the onboarding carousel is
+ * reachable; then, without a session and before "Continue as guest", only
+ * the Welcome flow; afterwards the whole app. Guests and signed-in users see
+ * exactly the same features.
  */
 function RootNavigator() {
-  const { isReady, needsWelcome } = useIdentity();
+  const { isReady, needsWelcome, needsOnboarding } = useIdentity();
+  const showWelcome = needsWelcome && !needsOnboarding;
+  const showApp = !needsWelcome && !needsOnboarding;
 
   useEffect(() => {
     if (isReady) SplashScreen.hideAsync();
@@ -76,12 +85,16 @@ function RootNavigator() {
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
       }}>
-      <Stack.Protected guard={needsWelcome} redirectTo="/">
+      <Stack.Protected guard={needsOnboarding} redirectTo={needsWelcome ? '/welcome' : '/'}>
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+      </Stack.Protected>
+
+      <Stack.Protected guard={showWelcome} redirectTo={needsOnboarding ? '/onboarding' : '/'}>
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
       </Stack.Protected>
 
       {/* Without a session or a guest choice, every app screen redirects to Welcome. */}
-      <Stack.Protected guard={!needsWelcome} redirectTo="/welcome">
+      <Stack.Protected guard={showApp} redirectTo={needsOnboarding ? '/onboarding' : '/welcome'}>
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="destination/[id]/index" />
         <Stack.Screen name="destination/[id]/edit" />

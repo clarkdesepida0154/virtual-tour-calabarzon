@@ -3,7 +3,13 @@ import { createContext, use, useCallback, useEffect, useMemo, useState } from 'r
 import type { ReactNode } from 'react';
 
 import { useDataSync } from '@/context/DataSyncContext';
-import { getOrCreateDeviceId, readGuestChosen, writeGuestChosen } from '@/lib/localPrefs';
+import {
+  getOrCreateDeviceId,
+  readGuestChosen,
+  readOnboardingSeen,
+  writeGuestChosen,
+  writeOnboardingSeen,
+} from '@/lib/localPrefs';
 import { authRepository, progressRepository } from '@/repositories';
 import type { SignUpResult } from '@/repositories';
 
@@ -29,6 +35,9 @@ export type Identity = {
   label: string;
   /** No session and no "continue as guest" choice yet → show Welcome. */
   needsWelcome: boolean;
+  /** A true first launch: the 3-slide carousel is shown once, before Welcome. */
+  needsOnboarding: boolean;
+  finishOnboarding: () => Promise<void>;
   continueAsGuest: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
@@ -37,7 +46,7 @@ export type Identity = {
 
 const IdentityContext = createContext<Identity | null>(null);
 
-type Loaded = { deviceId: string; guestChosen: boolean };
+type Loaded = { deviceId: string; guestChosen: boolean; onboardingSeen: boolean };
 
 const SESSION_RESTORE_TIMEOUT = 4000;
 
@@ -55,11 +64,15 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       authRepository.getSession(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), SESSION_RESTORE_TIMEOUT)),
     ]);
-    Promise.all([savedSession, getOrCreateDeviceId(), readGuestChosen()]).then(
-      ([saved, deviceId, guestChosen]) => {
+    Promise.all([savedSession, getOrCreateDeviceId(), readGuestChosen(), readOnboardingSeen()]).then(
+      ([saved, deviceId, guestChosen, onboardingSeen]) => {
         if (!active) return;
+        // Someone already using the app (from before onboarding existed) has
+        // no need for it — remember that, so signing out later skips it too.
+        const alreadyIn = saved !== null || guestChosen;
+        if (alreadyIn && !onboardingSeen) void writeOnboardingSeen(true);
         setSession(saved);
-        setLoaded({ deviceId, guestChosen });
+        setLoaded({ deviceId, guestChosen, onboardingSeen: onboardingSeen || alreadyIn });
       },
     );
     const unsubscribe = authRepository.onSessionChange((next) => {
@@ -77,6 +90,11 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const continueAsGuest = useCallback(() => setGuestChosen(true), [setGuestChosen]);
+
+  const finishOnboarding = useCallback(async () => {
+    await writeOnboardingSeen(true);
+    setLoaded((current) => (current ? { ...current, onboardingSeen: true } : current));
+  }, []);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -125,12 +143,14 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       email: user?.email ?? null,
       label: user?.email ?? 'Guest',
       needsWelcome: loaded !== null && !user && !loaded.guestChosen,
+      needsOnboarding: loaded !== null && !user && !loaded.guestChosen && !loaded.onboardingSeen,
+      finishOnboarding,
       continueAsGuest,
       signIn,
       signUp,
       signOut,
     };
-  }, [session, loaded, continueAsGuest, signIn, signUp, signOut]);
+  }, [session, loaded, finishOnboarding, continueAsGuest, signIn, signUp, signOut]);
 
   return <IdentityContext value={value}>{children}</IdentityContext>;
 }

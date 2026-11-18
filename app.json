@@ -14,7 +14,8 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.clark0154.virtualtour"
     },
     "web": {
       "output": "single",
@@ -29,11 +30,22 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 140
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Virtual Tour uses your location only on this phone, to show how far each destination is from you.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.clark0154.virtualtour"
     }
   }
 }

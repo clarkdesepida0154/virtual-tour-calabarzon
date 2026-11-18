@@ -49,17 +49,15 @@ export type DestinationUpdate = Partial<DestinationInsert>;
 /**
  * What lists and cards need. The long texts are left out so that browsing and
  * searching stay light; load the full `Destination` on the Details screen.
+ * The coordinates are included (two numbers) so cards can show "12.4 km away".
  */
 export type DestinationSummary = Pick<
   Destination,
-  'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url'
+  'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url' | 'latitude' | 'longitude'
 >;
 
-/** What the map needs: where a destination is and how to label its pin. */
-export type DestinationPin = Pick<
-  Destination,
-  'id' | 'name' | 'municipality' | 'province' | 'category' | 'cover_image_url'
-> & { latitude: number; longitude: number };
+/** What the map needs: a summary whose coordinates are known. */
+export type DestinationPin = DestinationSummary & { latitude: number; longitude: number };
 
 // ---------------------------------------------------------------------------
 // destination_images (Phase 2 photo gallery)
@@ -165,6 +163,26 @@ export type DestinationCompletionInsert = {
 export type DestinationCompletionUpdate = Partial<DestinationCompletionInsert>;
 
 // ---------------------------------------------------------------------------
+// favorites (Run 4) — keyed by the same user key as the progress tables
+// ---------------------------------------------------------------------------
+
+export type Favorite = {
+  id: string;
+  destination_id: string;
+  device_id: string;
+  created_at: string | null;
+};
+
+export type FavoriteInsert = {
+  id?: string;
+  destination_id: string;
+  device_id: string;
+  created_at?: string | null;
+};
+
+export type FavoriteUpdate = Partial<FavoriteInsert>;
+
+// ---------------------------------------------------------------------------
 // Database shape consumed by createClient<Database>()
 // ---------------------------------------------------------------------------
 
@@ -229,6 +247,14 @@ export type Database = {
             'destination_id',
             'destinations'
           >,
+        ];
+      };
+      favorites: {
+        Row: Favorite;
+        Insert: FavoriteInsert;
+        Update: FavoriteUpdate;
+        Relationships: [
+          ForeignKey<'favorites_destination_id_fkey', 'destination_id', 'destinations'>,
         ];
       };
     };

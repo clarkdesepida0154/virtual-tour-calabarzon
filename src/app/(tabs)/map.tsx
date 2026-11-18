@@ -9,13 +9,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { CoverImage } from '@/components/CoverImage';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryLegend } from '@/components/map/CategoryLegend';
 import { DestinationMap } from '@/components/map/DestinationMap';
 import type { MapFocus } from '@/components/map/types';
 import { CATEGORY_META, REGION_LABEL } from '@/constants/taxonomy';
 import type { Category } from '@/constants/taxonomy';
-import { useMapPins } from '@/hooks/useProgress';
+import { useMapPins } from '@/hooks/useDestinations';
 import { formatPlace } from '@/lib/format';
 import { colors, elevation, iconSize, layout, radius, spacing } from '@/theme';
 import type { DestinationPin } from '@/types/database';
@@ -116,6 +117,7 @@ export default function MapScreen() {
         {allPins.length > 0 ? (
           <CategoryLegend selected={category} onChange={changeCategory} counts={counts} />
         ) : null}
+        <OfflineBanner style={styles.offline} />
       </View>
 
       {pinsQuery.status === 'loading' ? (
@@ -198,6 +200,9 @@ function SelectedCard({
 }
 
 const styles = StyleSheet.create({
+  offline: {
+    marginHorizontal: spacing.lg,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.surfaceMuted,

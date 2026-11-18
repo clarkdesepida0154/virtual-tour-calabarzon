@@ -7,9 +7,10 @@
  */
 import { useIdentity } from '@/context/IdentityContext';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import { loadCatalogue } from '@/hooks/useDestinations';
 import { bestScoresByDestination, summarizeProgress } from '@/lib/progress';
 import type { BestScore } from '@/lib/progress';
-import { destinationsRepository, progressRepository, quizRepository } from '@/repositories';
+import { progressRepository, quizRepository } from '@/repositories';
 
 /** A destination's quiz (questions in order; options NOT yet shuffled). */
 export function useQuiz(destinationId: string) {
@@ -53,7 +54,7 @@ export function useProgressSummary() {
     `progress:${userKey}`,
     async () => {
       const [destinations, completions, attempts] = await Promise.all([
-        destinationsRepository.list(),
+        loadCatalogue(),
         progressRepository.listCompletions(userKey),
         progressRepository.listAttempts(userKey),
       ]);
@@ -63,7 +64,3 @@ export function useProgressSummary() {
   );
 }
 
-/** Every destination with coordinates, for the Map tab. */
-export function useMapPins() {
-  return useAsyncData('map-pins', () => destinationsRepository.listPins());
-}

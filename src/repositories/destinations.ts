@@ -23,9 +23,11 @@ const TABLE = 'destinations';
 /**
  * Columns for lists and cards. The long texts (description, history, cultural
  * significance) are left out on purpose: a list of 26 destinations would
- * otherwise download every essay on each search keystroke.
+ * otherwise download every essay on each search keystroke. The coordinates
+ * are kept: cards show the distance from the user ("Near me").
  */
-const SUMMARY_COLUMNS = 'id, name, municipality, province, category, cover_image_url';
+const SUMMARY_COLUMNS =
+  'id, name, municipality, province, category, cover_image_url, latitude, longitude';
 
 /** Postgres "invalid text representation" — e.g. an id that is not a UUID. */
 const INVALID_INPUT_SYNTAX = '22P02';
@@ -77,7 +79,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
   async function listPins(): Promise<DestinationPin[]> {
     const { data, error } = await client
       .from(TABLE)
-      .select(`${SUMMARY_COLUMNS}, latitude, longitude`)
+      .select(SUMMARY_COLUMNS)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .order('name', { ascending: true });

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { FeaturedCard } from '@/components/DestinationCard';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { SearchField } from '@/components/SearchField';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FeaturedCardSkeleton } from '@/components/Skeleton';
@@ -96,6 +97,8 @@ export default function HomeScreen() {
             placeholder="Search destinations or towns"
           />
         </View>
+
+        <OfflineBanner style={styles.offline} />
 
         {/* Featured carousel */}
         <View style={styles.section}>
@@ -269,6 +272,10 @@ function ProvinceRow({ province, count, showDivider, onPress }: ProvinceRowProps
 }
 
 const styles = StyleSheet.create({
+  offline: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,

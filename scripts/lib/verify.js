@@ -1,5 +1,5 @@
 /**
- * Checks that the live database holds exactly what the app expects: the six
+ * Checks that the live database holds exactly what the app expects: the seven
  * tables with RLS, the public photo bucket, and the full 26-destination
  * dataset with its photos and quizzes. Read-only.
  */
@@ -19,6 +19,7 @@ const EXPECTED_TABLES = [
   'destination_completions',
   'destination_images',
   'destinations',
+  'favorites',
   'quiz_attempts',
   'quiz_options',
   'quiz_questions',
