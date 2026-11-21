@@ -1,6 +1,7 @@
 /**
  * The field-trip route map (native, Run 6): numbered stop pins and the
- * route drawn as a straight-line Polyline in trip order. Each marker
+ * route as a Polyline in trip order — since Run 8 the road-following OSRM
+ * geometry (solid), or straight dashed segments as the fallback. Each marker
  * re-renders its bitmap only briefly (see DestinationMap.tsx), then freezes.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -14,20 +15,21 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { TripPin } from './TripPin';
 import type { TripMapProps } from './types';
 
-export function TripMap({ stops, start, label }: TripMapProps) {
+export function TripMap({ stops, start, label, route }: TripMapProps) {
   const { colors, mapStyle, scheme } = useAppTheme();
   const mapRef = useRef<MapView | null>(null);
   const [ready, setReady] = useState(false);
   const points = [...(start ? [start] : []), ...stops.map(({ latitude, longitude }) => ({ latitude, longitude }))];
   const shape = points.map((point) => `${point.latitude},${point.longitude}`).join(';');
+  const road = route && route.length > 1 ? route : null;
 
   // Re-frame whenever the route changes (order, stops, start).
   useEffect(() => {
     if (!ready || points.length === 0) return;
-    mapRef.current?.animateToRegion(regionForCoordinates(points), motion.camera);
+    mapRef.current?.animateToRegion(regionForCoordinates(road ? [...points, ...road] : points), motion.camera);
     // `shape` captures every change of `points`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, shape]);
+  }, [ready, shape, road]);
 
   return (
     <View style={StyleSheet.absoluteFill} accessible accessibilityLabel={label}>
@@ -43,8 +45,15 @@ export function TripMap({ stops, start, label }: TripMapProps) {
         toolbarEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}>
-        {points.length > 1 ? (
-          <Polyline coordinates={points} strokeColor={colors.primary} strokeWidth={layout.routeStroke} />
+        {road ? (
+          <Polyline coordinates={road} strokeColor={colors.primary} strokeWidth={layout.routeStroke} />
+        ) : points.length > 1 ? (
+          <Polyline
+            coordinates={points}
+            strokeColor={colors.primary}
+            strokeWidth={layout.routeStroke}
+            lineDashPattern={[...layout.routeDash]}
+          />
         ) : null}
         {start ? <FrozenMarker key={`start-${scheme}`} coordinate={start} start /> : null}
         {stops.map((stop, index) => (

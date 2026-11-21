@@ -72,6 +72,8 @@ create table public.destinations (
   history               text,
   cultural_significance text,
   cover_image_url       text,
+  -- Run 8: Street View panorama within 250 m (null = not curated, e.g. added in the app)
+  has_panorama          boolean,
   created_at            timestamptz default now(),
   updated_at            timestamptz default now()
 );

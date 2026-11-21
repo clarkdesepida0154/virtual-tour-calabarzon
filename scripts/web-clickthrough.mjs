@@ -33,6 +33,16 @@
  * an auto-generated starter quiz for a destination added through the form
  * (deleted again).
  *
+ * Run 8 adds (after every earlier flow): the planner's real road routing
+ * (OSRM — routed state, per-leg road figures, attribution, the route cached
+ * with a saved plan and reused with OSRM blocked, fallback on a failed
+ * call) and the in-app 360° step (curated site: deep link from Details,
+ * framed Maps Embed URL with key / radius / fov, hint, credit; uncurated
+ * site: no step; a user-added site: shown optimistically, then the
+ * "no imagery" note). Google's embed page is stubbed with a local page so
+ * the checks never depend on Google's tiles. The Run 6 planner checks run
+ * with OSRM stubbed to fail, so they now verify the straight-line fallback.
+ *
  * Web cannot show native Google Maps: the Map tab is checked against its web
  * stand-in (DestinationMap.web.tsx).
  */
@@ -356,6 +366,13 @@ try {
   await page.waitForTimeout(900);
   await shot(page, 'tour-gallery-2');
   await text(page, 'Continue').click();
+  // Run 8: a curated site with a panorama has a 360° View step after the
+  // Gallery (checked in the Run 8 block) — step through it; the original
+  // assertions below are unchanged.
+  if (await page.getByRole('heading', { name: 'Look around' }).filter({ visible: true }).first().waitFor({ timeout: 2500 }).then(() => true, () => false)) {
+    results.push('info  Tour: 360° View step present (Run 8) — continuing to Chapter I');
+    await text(page, 'Continue').filter({ visible: true }).first().click();
+  }
   await expectVisible(page, text(page, 'Chapter I'), 'Tour: History chapter');
   // Narration (museum audio guide)
   const listen = page.getByRole('button', { name: 'Listen to this chapter read aloud' }).filter({ visible: true });
@@ -654,11 +671,20 @@ try {
   };
   const lastOpened = () => page.evaluate(() => window.__opened.at(-1) ?? null);
 
-  // R6-1. 360° view on Details and on the tour's Gallery step
+  // Run 8: Google's embed page is replaced by a local stub (deterministic, no tiles).
+  const embedRequests = [];
+  await page.route('**/www.google.com/maps/embed/**', (route) => {
+    embedRequests.push(route.request().url());
+    return route.fulfill({ contentType: 'text/html', body: '<html><body style="margin:0;background:#444;color:#fff;font:14px sans-serif">STUB PANORAMA</body></html>' });
+  });
+
+  // R6-1. 360° view on Details and in the tour (Run 8: the external link is now
+  // "Open in Google Maps"; a curated site's tour has a 360° View step after the Gallery)
   await goTab(/Explore/);
   await page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).filter({ visible: true }).first().click();
-  await expectVisible(page, page.getByRole('button', { name: /View in 360°/ }), '360°: "View in 360°" on Details');
-  await page.getByRole('button', { name: /View in 360°/ }).filter({ visible: true }).first().click();
+  const externalPano = page.getByRole('button', { name: 'View Aguinaldo Shrine in 360 degrees in Google Street View' });
+  await expectVisible(page, externalPano, '360°: "Open in Google Maps" (Street View) on Details');
+  await externalPano.filter({ visible: true }).first().click();
   await page.waitForTimeout(300);
   const pano = await lastOpened();
   results.push(
@@ -668,15 +694,11 @@ try {
   );
   await text(page, 'Start Virtual Tour').filter({ visible: true }).first().click();
   await text(page, 'Begin the tour').filter({ visible: true }).first().click();
-  const tourPano = page.getByLabel('View Aguinaldo Shrine in 360 degrees in Google Street View');
-  await expectVisible(page, tourPano, '360°: "View in 360°" card on the tour Gallery step');
-  await page.waitForTimeout(900);
-  await shot(page, 'r6-tour-360');
-  await tourPano.filter({ visible: true }).first().click();
-  await page.waitForTimeout(300);
-  results.push(/map_action=pano&viewpoint=14\.445,120\.9069$/.test((await lastOpened()) ?? '') ? 'ok    360°: tour card opens the same pano URL' : `FAIL  tour 360 URL: ${await lastOpened()}`);
+  await expectVisible(page, page.getByRole('heading', { name: 'Through the lens' }), '360°: tour Gallery step');
   await text(page, 'Continue').filter({ visible: true }).first().click();
-  await expectVisible(page, text(page, 'Chapter I'), '360°: the tour still goes Gallery → Chapter I (no extra step)');
+  await expectVisible(page, page.getByRole('heading', { name: 'Look around' }), '360°: a curated site\'s tour goes Gallery → 360° View');
+  await text(page, 'Continue').filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Chapter I'), '360°: then 360° View → Chapter I');
   await page.getByLabel('Close the tour').click();
 
   // R6-2. Star ratings on Details, then on the Explore card
@@ -804,6 +826,13 @@ try {
   await expectVisible(page, page.getByRole('button', { name: /^Plan a field trip\./ }), 'Planner: Home card');
 
   // R6-6. Field trip planner: select → suggested order → reorder → Google Maps URL → save / delete
+  // Run 8: OSRM is stubbed to fail here, so these checks verify the straight-line fallback.
+  let osrmBlocked = 0;
+  const blockOsrm = (route) => {
+    osrmBlocked += 1;
+    return route.abort('internetdisconnected');
+  };
+  await page.route('**/router.project-osrm.org/**', blockOsrm);
   await goTab(/Map/);
   await page.getByRole('button', { name: 'Plan a field trip', exact: true }).filter({ visible: true }).first().click();
   await expectVisible(page, page.getByRole('heading', { name: 'Plan a field trip' }), 'Planner: opens from the Map header');
@@ -832,6 +861,11 @@ try {
       : `FAIL  suggested order: ${suggested.join(' → ')}`,
   );
   await expectVisible(page, text(page, /^Total ≈ \d+(\.\d)? km$/, false), 'Planner: total straight-line distance');
+  const straightTotal = await text(page, /^Total ≈ \d+(\.\d)? km$/, false).filter({ visible: true }).first().textContent();
+  const straightTime = await text(page, /^About .+ of driving$/, false).filter({ visible: true }).first().textContent();
+  await expectVisible(page, text(page, 'Straight-line route — approximate'), 'Routing fallback: OSRM call fails → "Straight-line route — approximate"');
+  await expectVisible(page, text(page, /^Road routing isn’t available right now/, false), 'Routing fallback: explanatory note, no error state');
+  results.push(osrmBlocked >= 1 ? `ok    Routing fallback: the OSRM request was made and failed (${osrmBlocked})` : 'FAIL  no OSRM request was attempted');
   await expectVisible(page, text(page, 'Straight-line distance — approximate'), 'Planner: distance labelled approximate');
   await expectVisible(page, text(page, /^About .+ of driving$/, false), 'Planner: rough time estimate');
   await expectVisible(page, page.getByLabel('Route map with 4 numbered stops'), 'Planner: route map with numbered stops');
@@ -866,6 +900,139 @@ try {
   const planGone = !(await page.getByRole('button', { name: /^Open the plan UI check trip/ }).isVisible().catch(() => false));
   results.push(planGone ? 'ok    Planner: saved plan deleted' : 'FAIL  plan still listed after delete');
   await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await page.unroute('**/router.project-osrm.org/**', blockOsrm);
+
+  // ===========================================================================
+  // Run 8: real road routing (OSRM) + the in-app 360° step
+  // ===========================================================================
+  results.push('info  --- Run 8: road routing + in-app 360° ---');
+  // R8-1. Routed state with the live OSRM demo server
+  await goTab(/Map/);
+  await page.getByRole('button', { name: 'Plan a field trip', exact: true }).filter({ visible: true }).first().click();
+  for (const name of ['Lucban Heritage Town', 'Aguinaldo Shrine', 'Rizal Shrine', 'Pila Heritage Town']) {
+    await page.getByRole('checkbox', { name: new RegExp(`^${name}`) }).filter({ visible: true }).first().click();
+  }
+  await page.getByRole('button', { name: /Plan the route \(4 stops\)/ }).click();
+  await expectVisible(page, text(page, 'Finding the road route…'), 'Routing: subtle loading chip on the map while OSRM answers');
+  const routed = await expectVisible(page, text(page, 'Road route'), 'Routing: OSRM answers → "Road route"');
+  await expectVisible(page, text(page, /^\d+(\.\d)? km drive · ~.+$/, false), 'Routing: total as "<km> km drive · ~<time>"');
+  const roadTotal = await text(page, /^\d+(\.\d)? km drive · ~.+$/, false).filter({ visible: true }).first().textContent().catch(() => null);
+  await expectVisible(page, text(page, /by road from the previous stop$/, false), 'Routing: per-leg road distance and time');
+  await expectVisible(page, text(page, 'Routing © OSRM / OpenStreetMap'), 'Routing: OSRM / OpenStreetMap attribution');
+  const straightGone = !(await text(page, 'Straight-line distance — approximate').filter({ visible: true }).count());
+  results.push(straightGone ? 'ok    Routing: straight-line heuristic dropped from the UI when routed' : 'FAIL  straight-line figures still shown');
+  const linePoints = await page
+    .getByLabel('Route map with 4 numbered stops')
+    .filter({ visible: true })
+    .first()
+    .evaluate((node) => (node.querySelector('polyline')?.getAttribute('points') ?? '').trim().split(/\s+/).length);
+  results.push(linePoints > 20 ? `ok    Routing: the map draws the road-following geometry (${linePoints} points)` : `FAIL  route line points: ${linePoints}`);
+  results.push(`info  sample plan Lucban → Pila → Rizal Shrine → Aguinaldo: road ${roadTotal} vs straight-line ${straightTotal} / ${straightTime}`);
+  await page.waitForTimeout(600);
+  await shot(page, 'r8-planner-routed');
+  // Save → the route is cached with the plan
+  await page.getByRole('button', { name: /Save plan/ }).click();
+  await page.waitForTimeout(800);
+  await page.locator('input:visible').last().fill('Road trip check');
+  await clickActionable(page.getByRole('button', { name: /^Save$/ }).filter({ visible: true }));
+  await expectVisible(page, text(page, 'Plan saved on this phone'), 'Routing: plan saved');
+  const cachedPlan = await page.evaluate(() => JSON.parse(localStorage.getItem('vtour.tripPlans') ?? '[]').find((plan) => plan.name === 'Road trip check'));
+  results.push(
+    cachedPlan?.route?.geometry?.length > 20 && cachedPlan.route.legs.length === 3
+      ? `ok    Routing: geometry (${cachedPlan.route.geometry.length} pts) + 3 legs cached with the saved plan`
+      : `FAIL  cached route: ${JSON.stringify(cachedPlan?.route ?? null).slice(0, 120)}`,
+  );
+  // Reopen with OSRM blocked → the cached route is reused, no request
+  osrmBlocked = 0;
+  await page.route('**/router.project-osrm.org/**', blockOsrm);
+  await page.getByRole('button', { name: /Edit stops/ }).click();
+  await page.getByRole('button', { name: /^Open the plan Road trip check, 4 stops$/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Road route'), 'Routing: a saved plan reopens with its cached road route');
+  await page.waitForTimeout(1500);
+  results.push(osrmBlocked === 0 ? 'ok    Routing: cache reuse — no OSRM request for the saved order' : `FAIL  OSRM asked ${osrmBlocked} time(s) for a cached order`);
+  // Reorder with OSRM failing → the fallback, never an error state
+  await page.getByLabel('Move Pila Heritage Town down').filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Straight-line route — approximate'), 'Routing: reorder with OSRM failing → straight-line fallback');
+  await expectVisible(page, text(page, /^Total ≈ \d+(\.\d)? km$/, false), 'Routing: fallback shows the approximate straight-line total');
+  const errorShown = await text(page, /Something went wrong|Try again/, false).filter({ visible: true }).count();
+  results.push(errorShown === 0 ? 'ok    Routing: no error state on failure' : 'FAIL  an error state appeared');
+  await page.unroute('**/router.project-osrm.org/**', blockOsrm);
+  await page.getByRole('button', { name: /Edit stops/ }).click();
+  await page.getByLabel('Delete the plan Road trip check').click();
+  await page.waitForTimeout(800);
+  await clickActionable(page.getByRole('button', { name: /^Delete$/ }).filter({ visible: true }));
+  await page.waitForTimeout(600);
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+
+  // R8-2. In-app 360°: curated site with a panorama (Aguinaldo Shrine)
+  await goTab(/Explore/);
+  await clickActionable(page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).filter({ visible: true }));
+  const inApp = page.getByRole('button', { name: 'View Aguinaldo Shrine in 360 degrees inside the virtual tour' });
+  await expectVisible(page, inApp, '360° step: curated Details has "View in 360°" (in the tour) next to "Open in Google Maps"');
+  embedRequests.length = 0;
+  await inApp.filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Look around' }), '360° step: Details deep-links straight into the tour\'s 360° View');
+  await expectVisible(page, text(page, '360° View'), '360° step: "360° View" overline on the exhibit wall');
+  await expectVisible(page, page.getByLabel('Step 3 of 6'), '360° step: inserted as step 3 of 6 (Intro, Gallery, 360°, I, II, Complete)');
+  const frameSrc = await page.locator('iframe[data-testid="panorama-frame"]').filter({ visible: true }).first().getAttribute('src').catch(() => null);
+  results.push(
+    /^https:\/\/www\.google\.com\/maps\/embed\/v1\/streetview\?key=AIza[0-9A-Za-z_-]{35}&location=14\.445,120\.9069&radius=250&fov=90$/.test(frameSrc ?? '')
+      ? 'ok    360° step: Maps Embed Street View URL (key from env, location, radius=250, fov=90)'
+      : `FAIL  360 frame src: ${(frameSrc ?? '').replace(/key=[^&]+/, 'key=…')}`,
+  );
+  results.push(embedRequests.length >= 1 ? 'ok    360° step: the frame requested the embed page (stubbed)' : 'FAIL  no embed request');
+  await expectVisible(page, text(page, 'Drag to look around'), '360° step: localized "Drag to look around" hint after load');
+  await expectVisible(page, text(page, 'Imagery © Google Street View'), '360° step: imagery credit');
+  await expectVisible(page, page.getByRole('button', { name: 'View Aguinaldo Shrine in 360 degrees in Google Street View' }), '360° step: "Open in Google Maps" way out');
+  await page.waitForTimeout(500);
+  await shot(page, 'r8-tour-360');
+  await page.getByLabel('Previous step').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Through the lens' }), '360° step: Back returns to the Gallery');
+  const galleryCard = await page.getByLabel('View Aguinaldo Shrine in 360 degrees in Google Street View').filter({ visible: true }).count();
+  results.push(galleryCard === 0 ? 'ok    360° step: the Gallery\'s external 360° card is not repeated when the step exists' : 'FAIL  gallery card still shown');
+  const beforeClose = await page.evaluate(() => [history.length, location.pathname]);
+  await page.getByLabel('Close the tour').click();
+  await page.waitForTimeout(1200);
+  const afterClose = await page.evaluate(() => [history.length, location.pathname]);
+  results.push(!afterClose[1].endsWith('/tour') ? 'ok    360° step: Close leaves the tour' : `FAIL  Close stayed on the tour (history ${beforeClose} → ${afterClose})`);
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+
+  // R8-3. Curated site WITHOUT a panorama (Taal Volcano & Lake): no step
+  const taal = await db.query("select id from public.destinations where name = 'Taal Volcano & Lake'");
+  await page.goto(`${BASE}/destination/${taal.rows[0].id}`);
+  await page.getByRole('heading', { name: 'Taal Volcano & Lake' }).filter({ visible: true }).first().waitFor({ timeout: 20000 });
+  await expectVisible(page, page.getByRole('button', { name: 'View Taal Volcano & Lake in 360 degrees in Google Street View' }), 'No-panorama site: "Open in Google Maps" stays on Details');
+  const noInApp = await page.getByRole('button', { name: 'View Taal Volcano & Lake in 360 degrees inside the virtual tour' }).filter({ visible: true }).count();
+  results.push(noInApp === 0 ? 'ok    No-panorama site: no in-tour "View in 360°" button' : 'FAIL  in-tour 360 button on a no-panorama site');
+  await text(page, 'Start Virtual Tour').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByLabel('Step 1 of 5'), 'No-panorama site: the tour keeps 5 steps');
+  await text(page, 'Begin the tour').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByLabel('View Taal Volcano & Lake in 360 degrees in Google Street View'), 'No-panorama site: the Gallery keeps its external 360° card');
+  await text(page, 'Continue').filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Chapter I'), 'No-panorama site: Gallery → Chapter I (no 360° step)');
+  const lookAround = await page.getByRole('heading', { name: 'Look around' }).filter({ visible: true }).count();
+  results.push(lookAround === 0 ? 'ok    No-panorama site: "Look around" never shown' : 'FAIL  360 step on a no-panorama site');
+  await page.getByLabel('Close the tour').click();
+
+  // R8-4. A destination added in the app (has_panorama null): shown optimistically,
+  // then the gentle "no imagery" note (Google's frame cannot be inspected).
+  const added = await db.query(
+    `insert into public.destinations (name, description, address, municipality, province, category, latitude, longitude)
+     values ('UI check Casa Tejeros 360', 'A restored estate house. Leaders met here in 1897.', 'Tejeros, Rosario, Cavite', 'Rosario', 'Cavite', 'Historical Site', 14.4166, 120.8571)
+     returning id, has_panorama`,
+  );
+  results.push(added.rows[0].has_panorama === null ? 'ok    User-added destination starts with has_panorama = null' : `FAIL  has_panorama: ${added.rows[0].has_panorama}`);
+  await page.goto(`${BASE}/destination/${added.rows[0].id}/tour?step=panorama`);
+  await expectVisible(page, page.getByRole('heading', { name: 'Look around' }), 'User-added site: 360° step shown optimistically (deep link)');
+  await expectVisible(page, text(page, 'No 360° imagery here yet'), 'User-added site: graceful "No 360° imagery here yet" note after the wait');
+  await page.waitForTimeout(400);
+  await shot(page, 'r8-tour-360-fallback');
+  await page.getByLabel('Close the tour').click();
+  await db.query("delete from public.destinations where name = 'UI check Casa Tejeros 360'");
+  await page.unroute('**/www.google.com/maps/embed/**');
+  // Back to a fresh app shell (the deep link replaced the stack) for the flows that follow.
+  await page.goto(BASE);
+  await page.getByRole('tab', { name: /Explore/ }).waitFor({ timeout: 20000 });
 
   // R6-7. Auto-generated starter quiz for a destination added in the app (then deleted)
   await goTab(/Explore/);

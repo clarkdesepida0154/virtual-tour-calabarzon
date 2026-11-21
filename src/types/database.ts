@@ -23,6 +23,12 @@ export type Destination = {
   history: string | null;
   cultural_significance: string | null;
   cover_image_url: string | null;
+  /**
+   * Run 8: Street View panorama within 250 m (build-time curation).
+   * null / missing = not curated (added in the app) → shown optimistically.
+   * Optional so rows cached before Run 8 still type-check.
+   */
+  has_panorama?: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };

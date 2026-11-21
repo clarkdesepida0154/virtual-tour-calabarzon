@@ -16,6 +16,8 @@ type Props = {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  /** Overrides the spoken name (defaults to the label). */
+  accessibilityLabel?: string;
 };
 
 const MODES = {
@@ -35,6 +37,7 @@ export function AppButton({
   disabled = false,
   style,
   accessibilityHint,
+  accessibilityLabel,
 }: Props) {
   const styles = useStyles();
   const { colors } = useAppTheme();
@@ -48,6 +51,7 @@ export function AppButton({
       loading={loading}
       disabled={disabled || loading}
       accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
       textColor={isDanger ? colors.error : undefined}
       style={[styles.button, isDanger && !disabled && styles.danger, style]}
       contentStyle={styles.content}

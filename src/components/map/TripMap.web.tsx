@@ -1,11 +1,13 @@
 /**
  * Web stand-in for the field-trip route map (Run 6): the stops plotted on
  * the same schematic "survey sheet" as DestinationMap.web.tsx, joined in
- * trip order by straight segments. Same props as TripMap.tsx.
+ * trip order — since Run 8 by the OSRM road geometry (an SVG polyline), or
+ * by straight dashed segments as the fallback. Same props as TripMap.tsx.
  */
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { LayoutRectangle } from 'react-native';
+import Svg, { Polyline } from 'react-native-svg';
 
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
@@ -20,13 +22,14 @@ import type { TripMapProps } from './types';
 const PIN_WIDTH = layout.tripPin + layout.pinShadowRoom * 2;
 const PIN_HEIGHT = layout.tripPin + layout.pinPointer - layout.pinRimWidth + layout.pinShadowRoom * 2;
 
-export function TripMap({ stops, start, label }: TripMapProps) {
+export function TripMap({ stops, start, label, route }: TripMapProps) {
   const styles = useStyles();
   const { colors } = useAppTheme();
   const { t } = useI18n();
   const [frame, setFrame] = useState<LayoutRectangle | null>(null);
   const points = [...(start ? [start] : []), ...stops];
-  const region = regionForCoordinates(points);
+  const road = route && route.length > 1 ? route : null;
+  const region = regionForCoordinates(road ? [...points, ...road] : points);
   const pad = spacing.xl;
 
   const project = (latitude: number, longitude: number) => {
@@ -41,26 +44,22 @@ export function TripMap({ stops, start, label }: TripMapProps) {
 
   return (
     <View style={styles.sheet} onLayout={(event) => setFrame(event.nativeEvent.layout)} accessible accessibilityLabel={label}>
-      {projected.slice(1).map((to, index) => {
-        const from = projected[index];
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        return (
-          <View
-            key={`seg-${index}`}
-            style={{
-              position: 'absolute',
-              left: (from.x + to.x) / 2 - length / 2,
-              top: (from.y + to.y) / 2 - layout.routeStroke / 2,
-              width: length,
-              height: layout.routeStroke,
-              backgroundColor: colors.primary,
-              transform: [{ rotate: `${Math.atan2(dy, dx)}rad` }],
-            }}
+      {frame ? (
+        <Svg width={frame.width} height={frame.height} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Polyline
+            points={(road ?? points).map((point) => {
+              const { x, y } = project(point.latitude, point.longitude);
+              return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(' ')}
+            fill="none"
+            stroke={colors.primary}
+            strokeWidth={layout.routeStroke}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            strokeDasharray={road ? undefined : layout.routeDash.join(' ')}
           />
-        );
-      })}
+        </Svg>
+      ) : null}
       {projected.map((point, index) => {
         const isStart = Boolean(start) && index === 0;
         const number = start ? index : index + 1;

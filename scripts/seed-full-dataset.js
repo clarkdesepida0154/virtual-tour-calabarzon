@@ -132,6 +132,7 @@ function buildRows(dataset, photos, baseUrl) {
       destination.history,
       destination.cultural_significance,
       urls[0],
+      typeof destination.has_panorama === 'boolean' ? destination.has_panorama : null,
     ]);
 
     // The cover is also row 0 of the gallery, so its photo credit is stored.
@@ -189,6 +190,7 @@ async function writeDatabase(client, rows) {
       [
         'id', 'name', 'description', 'address', 'municipality', 'province', 'category',
         'latitude', 'longitude', 'history', 'cultural_significance', 'cover_image_url',
+        'has_panorama',
       ],
       rows.destinations,
     );

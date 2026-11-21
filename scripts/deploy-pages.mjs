@@ -26,6 +26,17 @@ cpSync(join(out, 'index.html'), join(out, '404.html'));
 writeFileSync(join(out, '.nojekyll'), '');
 
 // Safety scan of everything we are about to publish.
+const dotenv = existsSync('.env')
+  ? Object.fromEntries(
+      readFileSync('.env', 'utf8')
+        .split(/\r?\n/)
+        .map((line) => line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/))
+        .filter(Boolean)
+        .map((m) => [m[1], m[2].replace(/^["']|["']$/g, '')]),
+    )
+  : {};
+const embedKey = (process.env.EXPO_PUBLIC_MAPS_EMBED_KEY || dotenv.EXPO_PUBLIC_MAPS_EMBED_KEY || '').trim();
+const androidKey = (process.env.GOOGLE_MAPS_ANDROID_API_KEY || dotenv.GOOGLE_MAPS_ANDROID_API_KEY || '').trim();
 const bad = [/AIza[0-9A-Za-z_-]{30,}/, /sb_secret_[A-Za-z0-9_-]{10,}/, /postgres(ql)?:\/\/[^\s"']*:[^\s"'@]+@/];
 let scanned = 0;
 (function walk(dir) {
@@ -34,7 +45,12 @@ let scanned = 0;
     if (statSync(p).isDirectory()) walk(p);
     else if (/\.(js|html|json|map|txt|css)$/.test(name)) {
       scanned++;
-      const text = readFileSync(p, 'utf8');
+      // Run 8: the Maps Embed key is publishable by design (API-restricted to the
+      // free Maps Embed API) and the 360° step needs it in the bundle. It is the
+      // ONLY Google key allowed; the Android Maps SDK key never is.
+      let text = readFileSync(p, 'utf8');
+      if (androidKey && text.includes(androidKey)) throw new Error(`Refusing to publish: the Android Maps SDK key found in ${p}`);
+      if (embedKey) text = text.split(embedKey).join('');
       for (const re of bad) if (re.test(text)) throw new Error(`Refusing to publish: ${re} found in ${p}`);
     }
   }

@@ -32,6 +32,8 @@ import { openDirections, openStreetView, shareDestination, tapFeedback } from '@
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
 import { distanceFrom } from '@/lib/geo';
+import { MAPS_EMBED_KEY } from '@/lib/embedKey';
+import { showsPanoramaStep } from '@/lib/panorama';
 import { hasCoordinates } from '@/lib/mapRegion';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
 import { iconSize, layout, radius, spacing } from '@/theme';
@@ -167,6 +169,18 @@ export default function DestinationDetailsScreen() {
     if (!(await openStreetView(destination))) showToast(t('streetView.failed'));
   };
 
+  // Run 8: curated destinations with a panorama also open the tour's in-app 360° step.
+  const inAppPanorama =
+    destination !== null &&
+    destination !== undefined &&
+    destination.has_panorama === true &&
+    showsPanoramaStep(destination, { offline, key: MAPS_EMBED_KEY });
+  const viewInTour = () => {
+    if (!destination) return;
+    tapFeedback();
+    router.push({ pathname: '/destination/[id]/tour', params: { id: destination.id, step: 'panorama' } });
+  };
+
   const share = async () => {
     if (!destination) return;
     const outcome = await shareDestination(destination);
@@ -274,12 +288,23 @@ export default function DestinationDetailsScreen() {
                     accessibilityHint={t('details.directionsHint')}
                     style={styles.directions}
                   />
-                  {!offline ? (
+                  {inAppPanorama ? (
                     <AppButton
-                      label={t('streetView.action')}
+                      label={t('panorama.viewInTour')}
                       icon="rotate-3d-variant"
                       variant="secondary"
+                      onPress={viewInTour}
+                      accessibilityLabel={t('panorama.viewInTourA11y', { name: destination.name })}
+                      style={styles.directions}
+                    />
+                  ) : null}
+                  {!offline ? (
+                    <AppButton
+                      label={t('panorama.openInMaps')}
+                      icon="google-street-view"
+                      variant="secondary"
                       onPress={() => void viewIn360()}
+                      accessibilityLabel={t('streetView.actionA11y', { name: destination.name })}
                       accessibilityHint={t('streetView.hint')}
                       style={styles.directions}
                     />

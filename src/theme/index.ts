@@ -152,6 +152,8 @@ export const layout = {
   certificateMedal: 84,
   /** Run 6: width of a route polyline on the planner map. */
   routeStroke: 4,
+  /** Dash / gap of the straight-line fallback route (Run 8). */
+  routeDash: [10, 8],
 } as const;
 
 export const motion = {

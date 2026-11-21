@@ -94,6 +94,8 @@ function validateDestination(destination, problems) {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(destination.slug || '')) at('slug must be kebab-case');
   if (!PROVINCES.includes(destination.province)) at(`invalid province "${destination.province}"`);
   if (!CATEGORIES.includes(destination.category)) at(`invalid category "${destination.category}"`);
+  // Run 8: build-time Street View curation (scripts/curate-panoramas.mjs).
+  if (typeof destination.has_panorama !== 'boolean') at('has_panorama must be true or false (run npm run panoramas:curate)');
 
   for (const [field, [min, max]] of Object.entries(WORD_LIMITS)) {
     const words = wordCount(destination[field]);

@@ -1,10 +1,13 @@
 /**
  * Virtual Tour — a guided, full-screen "exhibit" of one destination:
  *
- *   Intro → Gallery → History → Cultural Significance → Completion
+ *   Intro → Gallery → [360° View] → History → Cultural Significance → Completion
  *
  * Steps without content (for example a destination added in the app with no
- * history text) are skipped. The completion step marks the destination as
+ * history text) are skipped. The 360° View step (Run 8) appears only where
+ * src/lib/panorama.ts allows it — curated as having a panorama, or added in
+ * the app (optimistic) — and never offline, so every other destination keeps
+ * the original sequence. `?step=panorama` opens the tour on that step. The completion step marks the destination as
  * visited for the current user and leads into the quiz.
  */
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +25,7 @@ import { AppText } from '@/components/AppText';
 import { BestScoreBadge, PageDots, VisitedBadge } from '@/components/Badges';
 import { CoverImage } from '@/components/CoverImage';
 import { NarrationButton } from '@/components/NarrationButton';
+import { PanoramaStep } from '@/components/panorama/PanoramaStep';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag } from '@/components/Tag';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
@@ -35,17 +39,19 @@ import { useShowingSavedData } from '@/lib/appCache';
 import { openDirections, openStreetView, successFeedback, tapFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatPlace, splitLead } from '@/lib/format';
+import { MAPS_EMBED_KEY } from '@/lib/embedKey';
 import { hasCoordinates } from '@/lib/mapRegion';
+import { showsPanoramaStep } from '@/lib/panorama';
 import { progressRepository } from '@/repositories';
 import { iconSize, layout, motion, radius, spacing } from '@/theme';
 import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { Destination, DestinationImage } from '@/types/database';
 import { useI18n } from '@/context/I18nContext';
 
-type Step = 'intro' | 'gallery' | 'history' | 'culture' | 'complete';
+type Step = 'intro' | 'gallery' | 'panorama' | 'history' | 'culture' | 'complete';
 
 /** Steps shown on a dark "gallery wall"; the others sit on warm cream paper. */
-const DARK_STEPS: readonly Step[] = ['intro', 'gallery'];
+const DARK_STEPS: readonly Step[] = ['intro', 'gallery', 'panorama'];
 
 /** A photo to show: the gallery rows, or just the cover when there are none. */
 type Plate = { key: string; uri: string; caption: string | null };
@@ -54,8 +60,9 @@ export default function VirtualTourScreen() {
   const styles = useStyles();
   const { colors } = useAppTheme();
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; step?: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const requestedStep = Array.isArray(params.step) ? params.step[0] : params.step;
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -67,8 +74,18 @@ export default function VirtualTourScreen() {
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
 
   const destination = query.data;
+  const offline = useShowingSavedData();
   const plates = buildPlates(destination, images.data);
-  const steps = buildSteps(destination, plates);
+  const steps = buildSteps(destination, plates, offline);
+
+  // Deep link (Details → "View in 360°"): jump to the requested step once,
+  // as soon as the step list contains it (adjusted during render, not in an effect).
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  if (!deepLinkHandled && destination && requestedStep && images.status !== 'loading') {
+    const target = steps.indexOf(requestedStep as Step);
+    setDeepLinkHandled(true);
+    if (target > 0) setStepIndex(target);
+  }
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isDark = DARK_STEPS.includes(step);
 
@@ -141,7 +158,9 @@ export default function VirtualTourScreen() {
         {step === 'intro' ? (
           <IntroStep destination={destination} cover={plates[0]} visited={progress.data?.visited ?? false} />
         ) : step === 'gallery' ? (
-          <GalleryStep plates={plates} topInset={insets.top} destination={destination} />
+          <GalleryStep plates={plates} topInset={insets.top} destination={destination} withPanorama={steps.includes('panorama')} />
+        ) : step === 'panorama' ? (
+          <PanoramaStep destination={destination} topInset={insets.top} bottomInset={insets.bottom} />
         ) : step === 'history' ? (
           <ChapterStep
             numeral="I"
@@ -298,10 +317,13 @@ function GalleryStep({
   plates,
   topInset,
   destination,
+  withPanorama,
 }: {
   plates: Plate[];
   topInset: number;
   destination: Destination;
+  /** Run 8: the next step is the in-app 360° view, so the external card is not repeated here. */
+  withPanorama: boolean;
 }) {
   const styles = useStyles();
   const { t } = useI18n();
@@ -399,7 +421,7 @@ function GalleryStep({
           {t('tour.gallery.plate', { index: index + 1, count: plates.length })}
         </AppText>
         {current?.caption ? <Credit caption={current.caption} dark /> : null}
-        <StreetViewCard destination={destination} />
+        {withPanorama ? null : <StreetViewCard destination={destination} />}
       </View>
     </View>
   );
@@ -705,9 +727,10 @@ function buildPlates(destination: Destination | null | undefined, rows: Destinat
   return plates;
 }
 
-function buildSteps(destination: Destination | null | undefined, plates: Plate[]): Step[] {
+function buildSteps(destination: Destination | null | undefined, plates: Plate[], offline: boolean): Step[] {
   const steps: Step[] = ['intro'];
   if (plates.length > 0) steps.push('gallery');
+  if (destination && showsPanoramaStep(destination, { offline, key: MAPS_EMBED_KEY })) steps.push('panorama');
   if (destination?.history?.trim()) steps.push('history');
   if (destination?.cultural_significance?.trim()) steps.push('culture');
   steps.push('complete');

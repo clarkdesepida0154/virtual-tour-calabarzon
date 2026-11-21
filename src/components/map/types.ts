@@ -31,4 +31,9 @@ export type TripMapProps = {
   /** The person's location when the trip starts there. */
   start: { latitude: number; longitude: number } | null;
   label: string;
+  /**
+   * Run 8: the road-following line from OSRM. When null the route is drawn
+   * as straight dashed segments (the "approximate" fallback).
+   */
+  route?: { latitude: number; longitude: number }[] | null;
 };

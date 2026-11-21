@@ -137,6 +137,18 @@ async function checkContent(client, problems, log) {
       `Questions: ${total.questions} (expected ${EXPECTED_COUNT * QUESTIONS_PER_DESTINATION})  ` +
       `Options: ${total.options}, of which correct: ${total.correct_options}`,
   );
+
+  // Run 8: every dataset destination carries its curated panorama flag.
+  const pano = (
+    await client.query(
+      `select count(*) filter (where has_panorama) ::int as yes,
+              count(*) filter (where has_panorama = false)::int as no,
+              count(*) filter (where has_panorama is null)::int as unknown
+         from public.destinations`,
+    )
+  ).rows[0];
+  if (pano.unknown > 0) problems.push(`${pano.unknown} destination(s) without a has_panorama flag (run npm run db:sync-panoramas)`);
+  log(`  360° panoramas: ${pano.yes} with, ${pano.no} without (curated)`);
 }
 
 async function checkStorage(client, problems, log) {

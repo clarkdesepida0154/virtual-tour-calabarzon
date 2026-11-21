@@ -3,10 +3,10 @@
 **A museum-style mobile guide to 26 heritage sites and natural landmarks of
 Region IV-A, Philippines — built as a field trip you can take from a phone.**
 
-[![Version](https://img.shields.io/badge/version-1.1.0-9A3B26)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0) [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-C9A227)](https://clarkdesepida0154.github.io/virtual-tour-calabarzon/)
+[![Version](https://img.shields.io/badge/version-1.1.1-9A3B26)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.1) [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-C9A227)](https://clarkdesepida0154.github.io/virtual-tour-calabarzon/)
 
 **▶ Live web demo: https://clarkdesepida0154.github.io/virtual-tour-calabarzon/**
-· **⬇ Android APK: [v1.1.0 (recommended)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0)**
+· **⬇ Android APK: [v1.1.1 (recommended)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.1)**
 · **📄 Docs: [Technical Documentation](docs/Technical-Documentation.pdf) · [User Manual](docs/User-Manual.pdf) · [Wireframes](docs/Wireframes.pdf)**
 
 Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android, iOS & web
@@ -35,10 +35,10 @@ Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android, 
     <td align="center"><img src="docs/screenshots/settings.jpg" width="190" alt="Settings: appearance, language and narration"><br><sub>Settings</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/ui/44-r6-tour-360.jpg" width="190" alt="Tour gallery with the 360 degree card"><br><sub>360° Street View</sub></td>
+    <td align="center"><img src="docs/screenshots/ui/56-r8-tour-360.jpg" width="190" alt="In-app 360 degree Street View step of the tour"><br><sub>In-app 360° view</sub></td>
     <td align="center"><img src="docs/screenshots/ui/48-r6-badges.jpg" width="190" alt="Badges grid"><br><sub>Badges</sub></td>
     <td align="center"><img src="docs/screenshots/ui/49-r6-certificate.jpg" width="190" alt="Certificate of completion"><br><sub>Certificate</sub></td>
-    <td align="center"><img src="docs/screenshots/ui/53-r6-planner-plan.jpg" width="190" alt="Field trip planner route"><br><sub>Field trip planner</sub></td>
+    <td align="center"><img src="docs/screenshots/ui/55-r8-planner-routed.jpg" width="190" alt="Field trip planner with a road-following route"><br><sub>Planner · road routing</sub></td>
   </tr>
 </table>
 
@@ -87,9 +87,13 @@ error states were treated as first-class requirements rather than polish.
 - **Share** — the native share sheet with the name, a one-line description and
   "Town • Province".
 
-**Go further** (v1.1.0)
-- **360° view** — opens Google Street View at the destination (Details and the
-  tour gallery).
+**Go further** (v1.1.0 → v1.1.1)
+- **In-app 360° panoramas** (v1.1.1) — a **360° View** step in the tour, between
+  the gallery and Chapter I: Google Street View inside the app (Maps Embed API
+  in a WebView), drag to look around. Curated at build time: 25 of the 26
+  places have a panorama; the one without keeps the 5-step tour. "View in 360°"
+  on Details jumps straight there; "Open in Google Maps" opens Street View in
+  Google Maps for every place.
 - **Starter quiz for your own entries** — add a destination and the app writes
   a five-question quiz from your fields; edits regenerate it.
 - **Badges and certificates** — ten achievements derived from your activity,
@@ -98,8 +102,13 @@ error states were treated as first-class requirements rather than polish.
 - **Ratings and Heritage Insights** — rate places 1–5 stars; see most visited,
   top rated and toughest quizzes across all users.
 - **Field trip planner** — choose up to 8 stops, get a nearest-neighbour
-  order, adjust it, see distances and a rough time, then open the route in
-  Google Maps; plans save on the phone.
+  order, adjust it, then open the route in Google Maps; plans save on the
+  phone. **v1.1.1: real road routing** — the route follows the roads, with the
+  real driving distance and time per leg and in total ("38.7 km drive ·
+  ~52 min"), cached with saved plans; offline it falls back to straight
+  dashed lines with approximate figures. Routing © OSRM / OpenStreetMap
+  (demo routing via the public OSRM server; a production build would use the
+  Google Routes API).
 
 **Track**
 - **Progress** — visited count out of 26, quiz statistics, a completion bar
@@ -225,7 +234,7 @@ catalogue edits to editors.
 
 **Try it:** open the [live web demo](https://clarkdesepida0154.github.io/virtual-tour-calabarzon/),
 or install the Android APK from the
-[v1.1.0 release](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0)
+[v1.1.1 release](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.1)
 (the recommended version; v1.0.0 had a launch crash).
 
 **Run it from source** (Node.js 20+, the Expo Go app on a phone):
@@ -266,11 +275,11 @@ Pages base URL, adds the `404.html` fallback and publishes `gh-pages`).
 
 | Suite | Command | What it covers | Checks |
 | --- | --- | --- | --- |
-| Unit | `npm test` | Quiz scoring and shuffling, progress, auth validation, distances, favorites, offline cache, directions / Street View / share links, theme tokens and WCAG contrast in both themes, i18n, narration state machine, starter-quiz generator, badges, ratings, insights, certificates, planner, certificate sharing flow | 143 |
+| Unit | `npm test` | Quiz scoring and shuffling, progress, auth validation, distances, favorites, offline cache, directions / Street View / share links, theme tokens and WCAG contrast in both themes, i18n, narration state machine, starter-quiz generator, badges, ratings, insights, certificates, planner, certificate sharing flow, OSRM road routing (URL, decode, fallback, cache), 360° embed URL / step rule / curation | 168 |
 | Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage, quizzes, attempts, visits, favorites, ratings, starter quizzes, guest → account transfer. Cleans up after itself | 50 |
 | Auth (live) | `npm run auth:test` | Sign-in / sign-out, signed-in RLS, progress under the auth user id, friendly errors, with a temporary user | 6 |
-| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build in both themes and both languages, including every Run 6 module | 205 |
-| Languages | `npm run i18n:check` | 668 keys in English and Filipino: same keys, placeholders and plurals; no hard-coded UI text | — |
+| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build in both themes and both languages, including every Run 6 module, road routing (routed + stubbed failure) and the 360° step (curated, no-panorama, user-added) | 243 |
+| Languages | `npm run i18n:check` | 688 keys in English and Filipino: same keys, placeholders and plurals; no hard-coded UI text | — |
 | Dataset / database | `npm run data:check` · `npm run db:verify` | Dataset schema and answerable quizzes; 8 tables with RLS, 26 destinations, 78 photos, 130 questions, live photo links | — |
 | Static | `npm run typecheck` · `npm run lint` · `npx expo-doctor` | Strict TypeScript, ESLint, 20 / 20 Expo checks | — |
 | Secrets | `npm run secrets:check` | No password, secret key or credentialed connection string in any file or commit | — |
@@ -331,6 +340,9 @@ tests/                 Unit tests
   updates need a connection.
 - The web demo is a convenience build: its map is a schematic stand-in because
   native Google Maps runs only on the phone, and it has no haptics.
-- The 360° button opens Google Street View for every destination; where Google
-  has no panorama it shows the map (coverage could not be pre-checked because
-  the Street View metadata API is not enabled for the project's key).
+- 360° coverage was curated once at build time (Google may change its
+  imagery); some panoramas are user-contributed photospheres near the site.
+  Places added in the app get the 360° step optimistically, with a note when
+  Google has no imagery.
+- Road routing uses the public OSRM demo server (no uptime guarantee); the
+  planner falls back to straight lines when it does not answer.

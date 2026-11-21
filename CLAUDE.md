@@ -269,6 +269,73 @@ change**: the 134 earlier click-through checks still pass unchanged.
    (`vtour.tripPlans`, `src/lib/tripPlans.ts` with an injected store,
    bound in `appTripPlans.ts`; max 30 plans).
 
+### Run 8 — device-test upgrades (built)
+
+1. **Real road routing in the Field Trip Planner** — `src/lib/routing.ts`
+   (pure, fetcher injected) + `src/hooks/useTripRoute.ts`. One request per
+   plan to the **public OSRM demo server**
+   `https://router.project-osrm.org/route/v1/driving/<lng,lat;…>?overview=full&geometries=geojson`
+   (no key; **longitude first**) covering start? → every stop in order.
+   The GeoJSON line is decoded (`decodeGeometry`), thinned to ≤ 400 points
+   and drawn as the Polyline (native) / an SVG polyline (web); per-leg and
+   total **real driving distance and duration** replace the straight-line
+   heuristic ("38.7 km drive · ~52 min", "12.4 km · ~18 min by road from the
+   previous stop"). Fetched when the plan opens and on every reorder,
+   debounced 700 ms; 6 s timeout (`ROUTE_TIMEOUT_MS`); a subtle "Finding the
+   road route…" chip on the map meanwhile. Cache: the route (key = the
+   ordered points, 5 decimals) is saved with the plan in AsyncStorage
+   (`TripPlan.route`, `tripPlans.attachRoute`) and in a session memo, so a
+   saved plan reopens routed — also offline — without a request.
+   **Fallback** (offline, OSRM down, timeout, a bad answer): the Run 6
+   straight **dashed** line with the "approximate" figures and a short note —
+   never an error state. Attribution "Routing © OSRM / OpenStreetMap" under
+   the map. **Demo only:** production would use the Google Routes API
+   (keyed, SLA); the OSRM demo server has no uptime guarantee and a fair-use
+   policy.
+2. **In-app 360° panoramas** — `react-native-webview` 14.0.1 (in Expo Go).
+   Tour step **"360° View"** between Gallery and Chapter I
+   (`src/components/panorama/PanoramaStep.tsx`): full-bleed Street View from
+   the **Maps Embed API**
+   `https://www.google.com/maps/embed/v1/streetview?key=<EMBED_KEY>&location=<lat>,<lng>&radius=250&fov=90`
+   (`panoramaEmbedUrl()` in `src/lib/panorama.ts`). The Embed API refuses
+   top-level loads ("must be used in an iframe"), so the native WebView loads
+   `panoramaHtml()` — a tiny page that frames it (`PanoramaFrame.tsx`); web
+   renders the iframe directly (`PanoramaFrame.web.tsx`). Exhibit-wall
+   chrome, pulsing shimmer while loading, "Drag to look around" hint, Google
+   imagery credit, "Open in Google Maps" way out. **Step rule**
+   (`showsPanoramaStep`): `has_panorama = true` → shown, `false` → left out,
+   `null` (added in the app) → shown optimistically; never offline, without
+   coordinates or without the key. The app cannot read Google's
+   cross-origin frame, so for an uncurated place it shows "No 360° imagery
+   here yet" after 9 s (`PANORAMA_DETECT_MS`) — a gentle note, not a
+   detection. Tour deep link: `/destination/<id>/tour?step=panorama`.
+   Details: the external Street View button is now **"Open in Google Maps"**
+   (all destinations, a11y name unchanged); curated panoramas add
+   **"View in 360°"** → the tour's 360° step. The Gallery's external card
+   shows only when there is no 360° step.
+3. **Panorama curation** (build time) — `npm run panoramas:curate`
+   (`scripts/curate-panoramas.mjs`): headless Chromium loads the framed embed
+   for each dataset destination; panorama = Google's place card ("View on
+   Google Maps") present AND the frame not ≥ 90 % black (resampled up to 3×
+   when the card sits on a still-black frame). Writes `has_panorama` into
+   `data/destinations-seed.json` (+ `panorama_curation`) and the full table
+   to `data/panorama-curation.json`. Result 2026-11-21: **25 of 26** — only
+   Taal Volcano & Lake (coordinates on the lake) has none. Some matches are
+   user-contributed photospheres (place card "Untitled" or a contributor's
+   name) — still real panoramas. The DB gets it by migration
+   `20261123_has_panorama.sql` (nullable boolean) + `npm run
+   db:sync-panoramas` (one column by stable id, no reset; counts guarded).
+
+Key: `EXPO_PUBLIC_MAPS_EMBED_KEY` (`.env`, EAS env var for preview +
+production, plaintext; blank in `.env.example`; read only in
+`src/lib/embedKey.ts`). **It is publishable on purpose**: API-restricted to
+the Maps Embed API, which is free at any volume, and it ships in the app and
+the web bundle (`deploy-pages.mjs` allows exactly this key and still refuses
+any other `AIza…` key or the Android key). It must still never be committed
+(`secrets:check`). **Never put the Android Maps SDK key
+(`GOOGLE_MAPS_ANDROID_API_KEY`) in a WebView URL.** `app.config.js` fails an
+EAS build without the embed key.
+
 ### Identity model ("user key")
 
 No schema change: the text column `device_id` on `quiz_attempts` and
@@ -374,7 +441,7 @@ Semantic tokens to know:
 
 ### Languages (Run 5)
 
-- `src/i18n/en.ts` is the source of truth (668 keys since Run 7; 666 in Run 6; 490 in Run 5); `src/i18n/fil.ts` has
+- `src/i18n/en.ts` is the source of truth (688 keys since Run 8; 668 in Run 7; 666 in Run 6; 490 in Run 5); `src/i18n/fil.ts` has
   the same shape (`DictionaryShape<…>`, so a missing key is a type error).
   Filipino = everyday Taglish UI Filipino ("I-save", "Mga Paborito",
   "Tuklasin"); proper nouns stay.
@@ -410,6 +477,7 @@ Two files together define everything in the database:
 | `quiz_attempts` | `destination_id` → cascade, `device_id` (the user key), `score`, `total`, `taken_at`. One row per finished attempt. |
 | `destination_completions` | `destination_id` → cascade, `device_id` (the user key), `completed_at`, unique `(destination_id, device_id)` — so "Mark as Visited" is idempotent per user. |
 | `favorites` (Run 4) | `destination_id` → cascade, `device_id` (the user key), `created_at`, unique `(destination_id, device_id)`. Same permissive anon + authenticated policies. Added to the live DB by `supabase/migrations/20261118_favorites.sql` — no reset. |
+| `destinations.has_panorama` (Run 8) | nullable boolean: `true` / `false` from the build-time curation, `null` = not curated (added in the app). Added live by `supabase/migrations/20261123_has_panorama.sql`; filled by `npm run db:sync-panoramas`. |
 | `ratings` (Run 6) | `destination_id` → cascade, `device_id` (the user key), `stars` (CHECK 1–5), `created_at`, `updated_at` (trigger), unique `(destination_id, device_id)`. Same permissive policies. Added live by `supabase/migrations/20261122_ratings.sql`. |
 
 `quiz_questions.source` (Run 6): `text not null default 'curated'`, CHECK
@@ -553,6 +621,8 @@ the direct host is IPv6-only and does not.
 | `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
 | `npm run db:migrate` | Runs every file in `supabase/migrations/` (idempotent, one transaction each) against the live DB, and fails if existing destination / photo / question / option / attempt / visit / favorite / rating counts change. Use this — not `db:setup` — for additive schema changes. |
 | `npm run db:sync-photos` | **Non-destructive photo top-up**: uploads the processed photos and updates only `cover_image_url` and the `destination_images` URLs / captions by stable id. Use it after replacing photos so live progress and favorites survive (unlike `db:seed`). |
+| `npm run panoramas:curate` | Run 8. Headless check of every dataset destination's Maps Embed Street View → `has_panorama` in the dataset (`-- --dry-run`, `-- --shots <dir>`). Needs Playwright env vars and `EXPO_PUBLIC_MAPS_EMBED_KEY`. |
+| `npm run db:sync-panoramas` | Run 8. Copies `has_panorama` from the dataset to the live rows by stable id — no reset, counts guarded. Run after `panoramas:curate` (and after `db:migrate` on a DB without the column). |
 | `npm run i18n:check` | `scripts/i18n-check.ts`: en/fil dictionaries match (keys, placeholders, plurals, no empty text) and no hard-coded UI text in `src/app` / `src/components`. Run 5: 490 keys, clean. |
 | `npm run secrets:check` | Secret scan before any push: `.env` ignored and never committed; DB password (raw / URL-encoded), `sb_secret`, credentialed connection strings and Google keys absent from every tracked file and every commit. Prints counts only. |
 | `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
@@ -560,7 +630,7 @@ the direct host is IPv6-only and does not.
 | `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Run 6 adds 11 live checks (50 in all): every dataset question curated; create → 5-question starter quiz; regeneration on a quiz-field edit (old rows and options gone), none on an address edit; curated untouched; cascade; ratings upsert, unique + 1–5 check, per-key isolation, average, transfer dedupe; insights / badges / certificates from live rows. Cleans up after itself. |
 | `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
 | `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
-| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134; **Run 6 and Run 7: 205/205** (the 134 earlier checks first, unchanged, then 71 for 360°, ratings, badges + celebration, certificate in light and dark, insights, the planner and an auto-quiz destination added through the form and deleted again) (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134; **Run 6 and Run 7: 205/205; Run 8: 243/243** (the 134 earlier checks first, unchanged, then 71 for 360°, ratings, badges + celebration, certificate in light and dark, insights, the planner and an auto-quiz destination added through the form and deleted again) (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
 | `node scripts/deploy-pages.mjs` | Run 7. Exports the web build with the Pages base URL, adds `404.html` + `.nojekyll`, scans the bundle for secrets, force-pushes `gh-pages`. `--build` only exports to `dist-pages/`. |
 | `node scripts/build-docs.mjs` | Run 7. Prints `docs/{Technical-Documentation,User-Manual,Wireframes}.html` to PDF with headless Chromium (needs `PLAYWRIGHT_MODULE` / `PLAYWRIGHT_CHROMIUM` as above). |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
@@ -601,6 +671,7 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
     `mapRegion.ts`, `format.ts`, `geo.ts`, `favorites.ts`, `offlineCache.ts`,
     `outbound.ts`, Run 6's `quizGenerator.ts`, `autoQuiz.ts`, `achievements.ts`,
     `ratings.ts`, `insights.ts`, `certificate.ts`, `planner.ts`, `tripPlans.ts`,
+    Run 8's `routing.ts`, `panorama.ts`,
     `src/constants/taxonomy.ts`) free of React Native imports — the unit tests and live scripts load them in Node.
   - **Progress is always keyed by `useIdentity().userKey`**; never read or
     write progress rows with any other id.
@@ -803,6 +874,20 @@ assets/                Icons, splash emblem (sources in assets/brand)
   literal `sb_secret_`, so the deploy scan looks for a real key shape.
 - Long Playwright runs while another heavy job is running can flake on fixed
   waits (Run 7: the favorites un-heart check, 1.5 s) — re-run before debugging.
+- **Maps Embed API must be framed** (Run 8): loading the embed URL as a
+  top-level page shows "The Google Maps Embed API must be used in an
+  iframe". The WebView therefore loads an HTML string with an iframe
+  (`panoramaHtml`), and the curation script probes inside the frame.
+- **Click-through and the real embed** (Run 8): the Run 8 block stubs
+  `google.com/maps/embed/**` with a local page. With Google's real embed
+  loaded late in the long session, "Close the tour" once did not leave the
+  tour (it did in a fresh session — `history.length` unchanged); not
+  reproduced in isolation, so recheck on the web demo if it ever matters.
+  The legacy tour flow steps through the 360° View when present (logged as
+  `info`), so its original assertions are unchanged.
+- **OSRM** (Run 8): coordinates are `lng,lat`; `legs.length` = points − 1;
+  distances in metres, durations in seconds. The demo server sends CORS
+  headers, so the web build can call it directly.
 - **Street View metadata** (`maps.googleapis.com/maps/api/streetview/metadata`)
   answers `REQUEST_DENIED` with our Maps key (API not enabled in its Google
   Cloud project; re-tried in Run 7, same answer — the 360° button ships for
@@ -913,6 +998,14 @@ Run 7 (ship run) — complete
 - [x] Documentation package (`docs/`): Technical-Documentation, User-Manual, Wireframes (PDF + HTML sources)
 - [x] README refresh (live demo, v1.1.0, docs, new screenshots)
 
+Run 8 (device-test upgrades) — complete
+
+- [x] Field Trip Planner: real road routing (OSRM demo server), cached with saved plans, straight-line fallback, attribution
+- [x] In-app 360° step (Maps Embed API in react-native-webview) between Gallery and Chapter I; Details "View in 360°" deep link + "Open in Google Maps"
+- [x] Panorama curation at build time: 25 of 26 with a panorama; `has_panorama` migration + non-destructive sync (counts unchanged)
+- [x] QA: 168 unit, 50 db:test, 6 auth:test, 243 web click-through (205 earlier + 38 Run 8), 688 i18n keys, data:check, db:verify, secrets:check, tsc, lint, expo-doctor 20/20, Android Hermes export
+- [x] Ship v1.1.1 (versionCode 4)
+
 **The roadmap is complete.** Remaining owner-side optional items: restrict the
 Google Maps key to the package name + SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`
 (if not already done); enable the Street View Static API if per-destination
@@ -945,10 +1038,24 @@ gate the button on it, always showing it for user-added destinations).
   `docs/screenshots/ui`), then `node scripts/build-docs.mjs`.
 - **Before any push**: `npm run secrets:check`; before a release the full QA
   set listed under Run 7.
+- **Re-curate panoramas** (e.g. after editing coordinates or adding a
+  dataset destination): `npm run panoramas:curate` → `npm run data:check` →
+  `npm run db:sync-panoramas` → `npm run db:verify`. Never `db:seed` for it.
+- **Routing in production**: swap `OSRM_BASE` / `fetchRoadRoute` in
+  `src/lib/routing.ts` for the Google Routes API behind a server-side key
+  (the OSRM demo server is for demos only). The planner only needs a
+  `RoadRoute` (geometry + legs), so the UI does not change.
 - **Auth**: "Confirm email" is OFF in the Supabase dashboard (sign-ups sign
   straight in). The built-in mailer is rate-limited if it is turned back on.
 
 ## Not yet verified on a device
+
+**Run 8 (v1.1.1) is web- and test-verified only.** Phone-only parts: the
+360° WebView (Embed loading inside react-native-webview in Expo Go and in
+the APK, drag / pinch inside it, the shimmer timing, "View on Google Maps"
+links opening outside the app), the road Polyline on native Google Maps
+(geometry, camera framing that includes the whole road line), OSRM over
+mobile data (timeout → fallback), and the cached route after an app restart.
 
 **Runs 5–6 are web- and test-verified only; the owner will device-test the v1.1.0 APK after Run 7 (including certificate image sharing via expo-sharing on Android).** **Run 6 is web- and test-verified only.** Phone-only parts: the Street View
 hand-off (Google Maps app opening the pano; what Google shows where there is

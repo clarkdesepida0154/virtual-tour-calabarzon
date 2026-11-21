@@ -47,7 +47,7 @@ async function main() {
     let covers = 0;
     for (const row of rows.destinations) {
       const [id] = row;
-      const coverUrl = row[row.length - 1];
+      const coverUrl = row[11]; // cover_image_url (has_panorama follows it since Run 8)
       const result = await db.query(
         'update public.destinations set cover_image_url = $2::text where id = $1::uuid and cover_image_url is distinct from $2::text',
         [id, coverUrl],

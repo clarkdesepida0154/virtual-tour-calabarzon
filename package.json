@@ -1,6 +1,6 @@
 {
   "name": "virtual-tour-app",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -43,6 +43,7 @@
     "react-native-url-polyfill": "^4.0.0",
     "react-native-view-shot": "6.1.1",
     "react-native-web": "~0.21.4",
+    "react-native-webview": "14.0.1",
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
@@ -70,6 +71,8 @@
     "auth:test": "tsx scripts/verify-auth.mjs",
     "db:seed": "node scripts/seed-full-dataset.js",
     "db:sync-photos": "node scripts/sync-photos.js",
+    "db:sync-panoramas": "node scripts/sync-panoramas.js",
+    "panoramas:curate": "tsx scripts/curate-panoramas.mjs",
     "data:check": "node scripts/check-dataset.js",
     "i18n:check": "tsx scripts/i18n-check.ts",
     "secrets:check": "node scripts/secret-scan.js",

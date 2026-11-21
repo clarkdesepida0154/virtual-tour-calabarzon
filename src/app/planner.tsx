@@ -3,8 +3,10 @@
  *
  *   Select (searchable list, max 8 stops, optional "start from my location")
  *     → Plan (suggested nearest-neighbour order, manual up/down reorder,
- *             per-leg + total straight-line distance, a rough time estimate,
- *             the route on an embedded map with numbered pins)
+ *             the route on an embedded map with numbered pins; since Run 8
+ *             real road routing from OSRM — road-following line, driving
+ *             distance and time per leg and in total — with the straight
+ *             dashed line and "approximate" figures as the fallback)
  *     → "Open in Google Maps" (origin, waypoints, destination).
  *
  * Plans are saved / loaded / deleted on the phone (AsyncStorage, no table).
@@ -14,7 +16,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
 import { Button, Dialog, Portal, Switch, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,6 +38,7 @@ import { useI18n } from '@/context/I18nContext';
 import { useUserLocation } from '@/context/LocationContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestinations } from '@/hooks/useDestinations';
+import { useTripRoute } from '@/hooks/useTripRoute';
 import { useShowingSavedData } from '@/lib/appCache';
 import { tripPlans } from '@/lib/appTripPlans';
 import { openExternalUrl, tapFeedback } from '@/lib/device';
@@ -55,6 +58,7 @@ import {
   totalKm,
 } from '@/lib/planner';
 import type { Stop } from '@/lib/planner';
+import type { RoadRoute } from '@/lib/routing';
 import type { TripPlan } from '@/lib/tripPlans';
 import { MAX_PLAN_NAME } from '@/lib/tripPlans';
 import { iconSize, layout, maxFontScale, radius, spacing, typography } from '@/theme';
@@ -113,6 +117,21 @@ export default function PlannerScreen() {
   const stops = order.map(toStop).filter((stop): stop is Stop => stop !== null);
   const suggestedIds = orderNearestNeighbor(selectedStops, start).map((stop) => stop.id);
   const enoughStops = selectedStops.length >= 2 || (selectedStops.length >= 1 && start !== null);
+
+  // Run 8: road routing for the plan (OSRM), cached with a saved plan.
+  const routePoints =
+    phase === 'plan' ? [...(start ? [start] : []), ...stops.map(({ latitude, longitude }) => ({ latitude, longitude }))] : [];
+  const sameAsSaved = loadedPlan !== null && loadedPlan.stopIds.join('|') === order.join('|');
+  const trip = useTripRoute(routePoints, {
+    offline,
+    cached: sameAsSaved ? loadedPlan.route : null,
+    onRouted: (route: RoadRoute) => {
+      if (!loadedPlan || !sameAsSaved) return;
+      setLoadedPlan({ ...loadedPlan, route });
+      void tripPlans.attachRoute(loadedPlan.id, route);
+    },
+  });
+  const road = trip.status === 'routed' ? trip.route : null;
 
   const leave = () => {
     if (phase === 'plan') {
@@ -185,6 +204,7 @@ export default function PlannerScreen() {
       name: planName.trim() || t('planner.defaultName', { date: date(new Date().toISOString()) }),
       stopIds: order,
       fromLocation,
+      route: road,
     });
     setLoadedPlan(saved);
     setSaveVisible(false);
@@ -209,15 +229,16 @@ export default function PlannerScreen() {
   };
 
   const legs = legsFor(stops, start);
-  const km = totalKm(legs);
-  const minutes = estimateDriveMinutes(km);
-  const { hours, minutes: rest } = splitMinutes(minutes);
-  const timeText =
-    hours > 0 && rest > 0
+  const km = road ? road.km : totalKm(legs);
+  const formatTime = (value: number) => {
+    const { hours, minutes: rest } = splitMinutes(value);
+    return hours > 0 && rest > 0
       ? t('planner.hoursMinutes', { hours, minutes: rest })
       : hours > 0
         ? t('planner.hours', { hours })
         : t('planner.minutes', { minutes: rest });
+  };
+  const timeText = formatTime(road ? road.minutes : estimateDriveMinutes(km));
   // "4.2 km" / "850 m" (language-neutral); very short legs read "50 m".
   const distanceText = (value: number) => formatDistanceValue(Math.max(value, 0.05)) ?? '';
 
@@ -385,8 +406,41 @@ export default function PlannerScreen() {
         <ScreenHeader overline={t('planner.overline')} title={loadedPlan?.name ?? t('planner.title')} onBack={leave} />
         <View style={styles.planBody}>
           <View style={styles.mapFrame}>
-            <TripMap stops={stops} start={start} label={t('planner.mapA11y', { count: stops.length })} />
+            <TripMap stops={stops} start={start} route={road?.geometry ?? null} label={t('planner.mapA11y', { count: stops.length })} />
+            {trip.status === 'loading' ? (
+              <View style={styles.routingChip} accessibilityLiveRegion="polite" accessibilityLabel={t('planner.routing')}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <AppText variant="caption" color="inkSoft">
+                  {t('planner.routing')}
+                </AppText>
+              </View>
+            ) : null}
           </View>
+          <View style={styles.routeMeta}>
+            {trip.status === 'routed' || trip.status === 'fallback' ? (
+              <View style={styles.routeBadge} accessibilityLiveRegion="polite">
+                <AppIcon
+                  name={trip.status === 'routed' ? 'road-variant' : 'vector-line'}
+                  size="xs"
+                  color={trip.status === 'routed' ? 'primary' : 'inkSoft'}
+                />
+                <AppText variant="label" color={trip.status === 'routed' ? 'primary' : 'inkSoft'}>
+                  {trip.status === 'routed' ? t('planner.routedBadge') : t('planner.fallbackBadge')}
+                </AppText>
+              </View>
+            ) : null}
+            <AppText variant="caption" color="muted" style={styles.attribution}>
+              {t('planner.attribution')}
+            </AppText>
+          </View>
+          {trip.status === 'fallback' ? (
+            <View style={styles.note}>
+              <AppIcon name="information-outline" size="sm" color="inkSoft" />
+              <AppText variant="caption" color="inkSoft" style={styles.flex}>
+                {t('planner.fallbackNote')}
+              </AppText>
+            </View>
+          ) : null}
 
           <View style={styles.orderHead}>
             <View style={styles.flex}>
@@ -426,7 +480,9 @@ export default function PlannerScreen() {
               </View>
             ) : null}
             {stops.map((stop, index) => {
-              const leg = legs.find((entry) => entry.toId === stop.id);
+              const legIndex = legs.findIndex((entry) => entry.toId === stop.id);
+              const leg = legIndex >= 0 ? legs[legIndex] : undefined;
+              const roadLeg = road && legIndex >= 0 ? road.legs[legIndex] : undefined;
               return (
                 <View key={stop.id} style={[styles.stopRow, (index > 0 || start) && styles.divider]}>
                   <View style={styles.stopNumber} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -438,7 +494,13 @@ export default function PlannerScreen() {
                     <AppText variant="subtitle" numberOfLines={3}>
                       {stop.name}
                     </AppText>
-                    {leg ? (
+                    {leg && roadLeg ? (
+                      <AppText variant="caption" color="inkSoft">
+                        {leg.fromId === null
+                          ? t('planner.legRoadFromStart', { distance: distanceText(roadLeg.km), time: formatTime(roadLeg.minutes) })
+                          : t('planner.legRoadFromPrevious', { distance: distanceText(roadLeg.km), time: formatTime(roadLeg.minutes) })}
+                      </AppText>
+                    ) : leg ? (
                       <AppText variant="caption" color="inkSoft">
                         {leg.fromId === null
                           ? t('planner.legFromStart', { distance: distanceText(leg.km) })
@@ -478,6 +540,18 @@ export default function PlannerScreen() {
           </View>
 
           <View style={styles.totals}>
+            {road ? (
+              <View style={styles.totalRow}>
+                <AppIcon name="road-variant" size="md" color="secondaryDark" />
+                <View style={styles.flex}>
+                  <AppText variant="subtitle">{t('planner.roadTotal', { distance: distanceText(km), time: timeText })}</AppText>
+                  <AppText variant="caption" color="inkSoft">
+                    {t('planner.roadTotalNote')}
+                  </AppText>
+                </View>
+              </View>
+            ) : (
+              <>
             <View style={styles.totalRow}>
               <AppIcon name="map-marker-distance" size="md" color="secondaryDark" />
               <View style={styles.flex}>
@@ -496,6 +570,8 @@ export default function PlannerScreen() {
                 </AppText>
               </View>
             </View>
+              </>
+            )}
           </View>
 
           {offline ? (
@@ -676,6 +752,34 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
     overflow: 'hidden',
     backgroundColor: colors.surfaceMuted,
     ...elevation.card,
+  },
+  routingChip: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    ...elevation.card,
+  },
+  routeMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: -spacing.sm,
+  },
+  routeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  attribution: {
+    marginLeft: 'auto',
   },
   orderHead: {
     flexDirection: 'row',

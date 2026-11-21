@@ -1,0 +1,184 @@
+[
+  {
+    "slug": "aguinaldo-shrine",
+    "name": "Aguinaldo Shrine",
+    "province": "Cavite",
+    "has_panorama": true,
+    "place_label": "Aguinaldo Shrine (Museo ni Emilio Aguinaldo)"
+  },
+  {
+    "slug": "corregidor-island",
+    "name": "Corregidor Island",
+    "province": "Cavite",
+    "has_panorama": true,
+    "place_label": "Untitled"
+  },
+  {
+    "slug": "bonifacio-trial-house",
+    "name": "Bonifacio Trial House",
+    "province": "Cavite",
+    "has_panorama": true,
+    "place_label": "NHCP Museo ng Paglilitis ni Andres Bonifacio (Bonifacio Trial House)"
+  },
+  {
+    "slug": "imus-cathedral",
+    "name": "Imus Cathedral",
+    "province": "Cavite",
+    "has_panorama": true,
+    "place_label": "Imus, Calabarzon"
+  },
+  {
+    "slug": "tagaytay-ridge",
+    "name": "Tagaytay Ridge–Taal Volcano Viewpoint",
+    "province": "Cavite",
+    "has_panorama": true,
+    "place_label": "Tagaytay Picnic Grove"
+  },
+  {
+    "slug": "rizal-shrine",
+    "name": "Rizal Shrine",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "Bahay ni Dr. Jose Rizal (Museo ni Rizal)."
+  },
+  {
+    "slug": "pagsanjan-falls",
+    "name": "Pagsanjan Falls",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "Cavinti Falls"
+  },
+  {
+    "slug": "nagcarlan-underground-cemetery",
+    "name": "Nagcarlan Underground Cemetery",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "Toper Porto"
+  },
+  {
+    "slug": "pila-heritage-town",
+    "name": "Pila Heritage Town",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "109 Burzagom St"
+  },
+  {
+    "slug": "paete",
+    "name": "Paete Woodcarving Town & St. James the Apostle Church",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "Santiago Apostol Parish - Paete, Laguna"
+  },
+  {
+    "slug": "mount-makiling",
+    "name": "Mount Makiling",
+    "province": "Laguna",
+    "has_panorama": true,
+    "place_label": "Mount Makiling"
+  },
+  {
+    "slug": "taal-heritage-town",
+    "name": "Taal Heritage Town & Basilica of St. Martin de Tours",
+    "province": "Batangas",
+    "has_panorama": true,
+    "place_label": "Minor Basilica and Parish of St. Martin of Tours"
+  },
+  {
+    "slug": "taal-volcano",
+    "name": "Taal Volcano & Lake",
+    "province": "Batangas",
+    "has_panorama": false,
+    "place_label": null
+  },
+  {
+    "slug": "mabini-shrine",
+    "name": "Apolinario Mabini Shrine",
+    "province": "Batangas",
+    "has_panorama": true,
+    "place_label": "Apolinario Mabini Shrine"
+  },
+  {
+    "slug": "caleruega-church",
+    "name": "Caleruega Church",
+    "province": "Batangas",
+    "has_panorama": true,
+    "place_label": "Caleruega Chapel of Transfiguration"
+  },
+  {
+    "slug": "anilao",
+    "name": "Anilao Diving & Marine Sanctuary",
+    "province": "Batangas",
+    "has_panorama": true,
+    "place_label": "Bauan, Calabarzon"
+  },
+  {
+    "slug": "angono-petroglyphs",
+    "name": "Angono Petroglyphs",
+    "province": "Rizal",
+    "has_panorama": true,
+    "place_label": "National Museum Angono-Binangonan Petroglyphs - Rizal"
+  },
+  {
+    "slug": "masungi-georeserve",
+    "name": "Masungi Georeserve",
+    "province": "Rizal",
+    "has_panorama": true,
+    "place_label": "Masungi Georeserve"
+  },
+  {
+    "slug": "antipolo-cathedral",
+    "name": "Antipolo Cathedral",
+    "province": "Rizal",
+    "has_panorama": true,
+    "place_label": "Antipolo Cathedral"
+  },
+  {
+    "slug": "pinto-art-museum",
+    "name": "Pinto Art Museum",
+    "province": "Rizal",
+    "has_panorama": true,
+    "place_label": "Pintô Art Museum"
+  },
+  {
+    "slug": "daranak-falls",
+    "name": "Daranak Falls",
+    "province": "Rizal",
+    "has_panorama": true,
+    "place_label": "Brian Geronimo"
+  },
+  {
+    "slug": "villa-escudero",
+    "name": "Villa Escudero Plantations",
+    "province": "Quezon",
+    "has_panorama": true,
+    "place_label": "Villa Escudero Plantations and Resort"
+  },
+  {
+    "slug": "kamay-ni-hesus",
+    "name": "Kamay ni Hesus Shrine",
+    "province": "Quezon",
+    "has_panorama": true,
+    "place_label": "Kamay Ni Hesus Healing Church"
+  },
+  {
+    "slug": "malagonlong-bridge",
+    "name": "Malagonlong Bridge",
+    "province": "Quezon",
+    "has_panorama": true,
+    "place_label": "[Untitled]"
+  },
+  {
+    "slug": "tayabas-basilica",
+    "name": "Minor Basilica of St. Michael the Archangel",
+    "province": "Quezon",
+    "has_panorama": true,
+    "place_label": "Minor Basilica of St. Michael the Archangel and the Diocesan Shrine of St Didachus of Alcala"
+  },
+  {
+    "slug": "lucban",
+    "name": "Lucban Heritage Town & Pahiyas Festival",
+    "province": "Quezon",
+    "has_panorama": true,
+    "place_label": "Parish of St. Louis, Bishop and Diocesan Shrine of St. Isidore the Farmer"
+  }
+]

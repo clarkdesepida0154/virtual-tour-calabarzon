@@ -7,7 +7,7 @@
   <h1>Virtual Tour &amp; Cultural Mapping — CALABARZON</h1>
   <div class="sub">Technical Documentation: requirements, architecture, data model, quality assurance and release process.</div>
   <div class="meta">
-    Version 1.1.0 (Android versionCode 3)<br>
+    Version 1.1.1 (Android versionCode 4)<br>
     Platform: Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase<br>
     Source: github.com/clarkdesepida0154/virtual-tour-calabarzon<br>
     Live web demo: clarkdesepida0154.github.io/virtual-tour-calabarzon<br>
@@ -26,6 +26,8 @@
     <li>Identity and authentication model</li>
     <li>Offline strategy</li>
     <li>Internationalisation and theming</li>
+    <li>Road routing (Field Trip Planner)</li>
+    <li>In-app 360° panoramas</li>
     <li>Testing strategy and final results</li>
     <li>Security notes</li>
     <li>Build and release process</li>
@@ -67,6 +69,7 @@
 <tr><td>Directions, Near me, favorites, share, offline catalogue, haptics, onboarding</td><td><code>lib/outbound.ts</code>, <code>context/LocationContext.tsx</code>, <code>context/FavoritesContext.tsx</code>, <code>lib/offlineCache.ts</code>, <code>app/onboarding.tsx</code></td></tr>
 <tr><td>Dark mode, Filipino UI, settings, photo credits, narration, accessibility pass</td><td><code>theme/</code>, <code>i18n/</code>, <code>app/settings.tsx</code>, <code>app/credits.tsx</code>, <code>components/NarrationButton.tsx</code></td></tr>
 <tr><td>360° view, starter quiz, badges, ratings, insights, certificate, trip planner</td><td><code>lib/outbound.ts</code>, <code>lib/quizGenerator.ts</code> + <code>autoQuiz.ts</code>, <code>lib/achievements.ts</code>, <code>repositories/ratings.ts</code>, <code>lib/insights.ts</code>, <code>lib/certificate.ts</code> + <code>certificateShare.ts</code>, <code>lib/planner.ts</code></td></tr>
+<tr><td>Road routing in the planner, in-app 360° panoramas (v1.1.1)</td><td><code>lib/routing.ts</code>, <code>hooks/useTripRoute.ts</code>, <code>lib/panorama.ts</code>, <code>components/panorama/</code>, <code>scripts/curate-panoramas.mjs</code></td></tr>
 </tbody></table>
 
 <h2 class="pb">3. Architecture</h2>
@@ -180,22 +183,44 @@
 <h3>Theming</h3>
 <p>Two palettes with identical keys (<code>theme/palettes.ts</code>) are turned into Paper, navigation and Google-Maps themes by <code>buildTheme()</code>. Components build per-theme styles with <code>makeStyles()</code>; there are no literal colours or font sizes in screens (a sweep enforces it). Settings → Appearance offers System / Light / Dark with instant application, including status bars, the window background and the map style. Unit tests check token completeness and WCAG AA contrast for every text / icon pair in both palettes. Design constants (the tour's dark “gallery wall”, text over photos, the printed certificate) are identical in both themes by design.</p>
 
-<h2 class="pb">9. Testing strategy and final results</h2>
+<h2 class="pb">9. Road routing (Field Trip Planner)</h2>
+<p>Since v1.1.1 the planner draws the route along real roads and reports real driving distance and time. Routing uses the <b>public OSRM demo server</b> (Open Source Routing Machine on OpenStreetMap data, no key). A production deployment would use the <b>Google Routes API</b> behind a server-held key; only <code>src/lib/routing.ts</code> would change.</p>
+<table><thead><tr><th style="width:26%">Part</th><th>Design</th></tr></thead><tbody>
+<tr><td>Request</td><td>One request per plan covering every point in order (the person's location when “Start from my location” is on, then each stop): <code>router.project-osrm.org/route/v1/driving/&lt;lng,lat;…&gt;?overview=full&amp;geometries=geojson</code>. OSRM takes <b>longitude first</b>; <code>buildOsrmUrl()</code> builds it and is unit-tested for the order.</td></tr>
+<tr><td>Answer</td><td><code>parseOsrmRoute()</code> accepts only <code>code: "Ok"</code> with <i>points − 1</i> legs: per-leg metres / seconds become km and whole minutes; the GeoJSON <code>[lng, lat]</code> line is decoded and thinned to ≤ 400 points (both ends kept) for drawing and storage.</td></tr>
+<tr><td>When</td><td>On opening the plan and on every reorder, debounced 700 ms (<code>useTripRoute</code>), so a burst of moves makes one request. A subtle “Finding the road route…” chip sits on the map meanwhile.</td></tr>
+<tr><td>Cache</td><td>The route is keyed by its ordered points (5 decimals) and saved with the plan in AsyncStorage (<code>TripPlan.route</code>); a session memo covers unsaved orders. A saved plan therefore reopens routed — also offline — without a request.</td></tr>
+<tr><td>Fallback</td><td>Offline, a 6-second timeout, a server error or a malformed answer all resolve to <i>no route</i> (the fetch never throws). The map then draws the straight <b>dashed</b> line and the totals return to the “approximate” straight-line figures with a short note. There is no error state.</td></tr>
+<tr><td>Drawing</td><td>Native: a <code>react-native-maps</code> Polyline (solid road line; dashed fallback) with the camera framed on stops and line. Web: an SVG polyline on the schematic map.</td></tr>
+<tr><td>Attribution</td><td>“Routing © OSRM / OpenStreetMap” under the map.</td></tr>
+</tbody></table>
+
+<h2>10. In-app 360° panoramas</h2>
+<p>The tour gains a <b>360° View</b> step between the Gallery and Chapter I: full-bleed Google Street View inside the app, from the <b>Maps Embed API</b> (<code>google.com/maps/embed/v1/streetview?key=…&amp;location=&lt;lat&gt;,&lt;lng&gt;&amp;radius=250&amp;fov=90</code>) in <code>react-native-webview</code> (included in Expo Go).</p>
+<table><thead><tr><th style="width:26%">Part</th><th>Design</th></tr></thead><tbody>
+<tr><td>Frame</td><td>The Embed API refuses to load as a top-level page, so the WebView loads a tiny HTML page that frames it (<code>panoramaHtml()</code>); the web build renders the iframe directly. Exhibit-wall chrome, a pulsing shimmer while loading, a localized “Drag to look around” hint, Google's credit and an “Open in Google Maps” way out.</td></tr>
+<tr><td>When the step appears</td><td><code>showsPanoramaStep()</code>: <code>has_panorama = true</code> → shown; <code>false</code> → left out, so those tours keep the original five steps; <code>null</code> (added in the app) → shown optimistically. Never offline, without coordinates or without the key. Details offers <b>View in 360°</b> (deep link to the step) for curated panoramas and <b>Open in Google Maps</b> (Street View app / site) for every destination.</td></tr>
+<tr><td>Curation</td><td>At build time <code>npm run panoramas:curate</code> loads the framed embed for each dataset destination in headless Chromium. A panorama is confirmed when Google's place card is shown and the frame is not ≥ 90 % black; the result is written as <code>has_panorama</code> into the dataset, reaching the live database through an additive migration and a one-column sync by stable id (no reset; row counts verified unchanged). Result: <b>25 of 26</b> destinations; only Taal Volcano &amp; Lake has no imagery within 250 m.</td></tr>
+<tr><td>Uncurated places</td><td>The app cannot read Google's cross-origin frame, so for a place added in the app it shows a gentle “No 360° imagery here yet” note with the Google Maps way out after nine seconds.</td></tr>
+<tr><td>Key</td><td><code>EXPO_PUBLIC_MAPS_EMBED_KEY</code> is <b>publishable by design</b>: API-restricted to the Maps Embed API, which is free at any volume, and bundled into the app and the web demo. It lives in <code>.env</code> and an EAS variable, never in git. The Android Maps SDK key is never placed in a WebView URL.</td></tr>
+</tbody></table>
+
+<h2 class="pb">11. Testing strategy and final results</h2>
 <p>Strategy: logic is pure and unit-tested; data code is tested against the real Supabase project through the same repositories the app uses; flows are verified end to end on the web export with a headless browser; static checks and a secret scan gate every push. Tests create their own rows and clean up after themselves.</p>
 <table><thead><tr><th>Suite</th><th>Command</th><th>Final result</th></tr></thead><tbody>
-<tr><td>Unit tests</td><td><code>npm test</code></td><td><b>143 / 143</b> pass</td></tr>
+<tr><td>Unit tests</td><td><code>npm test</code></td><td><b>168 / 168</b> pass</td></tr>
 <tr><td>Data layer (live)</td><td><code>npm run db:test</code></td><td><b>50 / 50</b> pass</td></tr>
 <tr><td>Authentication (live)</td><td><code>npm run auth:test</code></td><td><b>6 / 6</b> pass</td></tr>
-<tr><td>Web click-through (e2e)</td><td><code>node scripts/web-clickthrough.mjs</code></td><td><b>205 / 205</b> pass</td></tr>
-<tr><td>Languages</td><td><code>npm run i18n:check</code></td><td>668 keys in each language, clean</td></tr>
+<tr><td>Web click-through (e2e)</td><td><code>node scripts/web-clickthrough.mjs</code></td><td><b>243 / 243</b> pass</td></tr>
+<tr><td>Languages</td><td><code>npm run i18n:check</code></td><td>688 keys in each language, clean</td></tr>
 <tr><td>Dataset</td><td><code>npm run data:check</code></td><td>Valid; every quiz answer is in its text</td></tr>
-<tr><td>Database</td><td><code>npm run db:verify</code></td><td>26 destinations, 78 photos, 130 questions, RLS on 8 tables, photo links 200</td></tr>
+<tr><td>Database</td><td><code>npm run db:verify</code></td><td>26 destinations, 78 photos, 130 questions, RLS on 8 tables, photo links 200, panorama flags 25 / 1</td></tr>
 <tr><td>Static</td><td><code>npx tsc --noEmit</code> · <code>npx expo lint</code> · <code>npx expo-doctor</code></td><td>TypeScript 0 errors · ESLint 0 warnings · expo-doctor 20 / 20</td></tr>
 <tr><td>Secrets</td><td><code>npm run secrets:check</code></td><td>Clean across the working tree and full git history</td></tr>
 <tr><td>Native bundle</td><td><code>npx expo export --platform android</code></td><td>Hermes bundle builds</td></tr>
 </tbody></table>
 
-<h2>10. Security notes</h2>
+<h2>12. Security notes</h2>
 <h3>Row Level Security stance</h3>
 <p>RLS is enabled on all eight tables and on the storage bucket. For this classroom project the policies are <b>deliberately permissive</b> (select / insert / update / delete) for both <code>anon</code> (guests) and <code>authenticated</code> users, with explicit grants; this is what allows guest progress and in-app catalogue editing without a server of our own. Policy names keep an <code>_anon_</code> suffix because the verification script looks them up by name.</p>
 <h3>Production plan</h3>
@@ -209,31 +234,33 @@
 <ul>
 <li>Only <code>EXPO_PUBLIC_</code> variables are read by app code: the Supabase URL and the <b>publishable</b> key, which is designed to be public (access is governed by RLS). The secret key is never used.</li>
 <li><code>SUPABASE_DB_URL</code> is used only by setup and test scripts and is never imported by the app.</li>
+<li>The Maps Embed key (<code>EXPO_PUBLIC_MAPS_EMBED_KEY</code>) is public on purpose — API-restricted to the free Maps Embed API — and is the only Google key the web-demo scan allows in the bundle.</li>
 <li>The Google Maps key is read from <code>.env</code> / an EAS secret, is injected only into the native build, and is restricted in Google Cloud to the package name and the signing certificate's SHA-1.</li>
 <li><code>.env</code> is git-ignored; <code>npm run secrets:check</code> scans the tree and every commit for the DB password (raw and URL-encoded), secret keys, credentialed connection strings and Google keys before any push. The web-demo deploy script performs a similar scan of the bundle before publishing.</li>
 <li>Photos come only from Wikimedia Commons under free licences and are credited in the app.</li>
 </ul>
 
-<h2>11. Build and release process</h2>
+<h2>13. Build and release process</h2>
 <table><thead><tr><th style="width:24%">Step</th><th>Detail</th></tr></thead><tbody>
-<tr><td>Versioning</td><td><code>app.json</code> holds <code>version</code> and <code>android.versionCode</code> (<code>appVersionSource: local</code>); both are bumped for each APK. v1.0.0 → v1.0.1 (launch-crash fix) → v1.1.0 (versionCode 3).</td></tr>
+<tr><td>Versioning</td><td><code>app.json</code> holds <code>version</code> and <code>android.versionCode</code> (<code>appVersionSource: local</code>); both are bumped for each APK. v1.0.0 → v1.0.1 (launch-crash fix) → v1.1.0 (versionCode 3) → v1.1.1 (versionCode 4: road routing, in-app 360°).</td></tr>
 <tr><td>Android APK</td><td>EAS Build, <code>preview</code> profile (<code>buildType: apk</code>), package <code>com.clark0154.virtualtour</code>, EAS-managed keystore (same signing certificate for every release so the Maps-key restriction holds). Because the project path contains an apostrophe, the build is started from a junction with <code>EAS_NO_VCS=1</code>; <code>.easignore</code> keeps photos, docs and tests out of the upload.</td></tr>
-<tr><td>Build-time configuration</td><td>The two public Supabase values and the Maps key are EAS environment variables; <code>app.config.js</code> fails an Android build that lacks the Maps key.</td></tr>
+<tr><td>Build-time configuration</td><td>The two public Supabase values, the Maps Embed key and the Maps key are EAS environment variables; <code>app.config.js</code> fails an EAS build that lacks the Embed key or (Android) the Maps key.</td></tr>
 <tr><td>R8 / minification</td><td>Disabled on purpose with keep rules in place: WorkManager (pulled in by react-native-maps) builds its Room database by reflection and crashed v1.0.0 at launch under R8.</td></tr>
-<tr><td>Distribution</td><td>APK attached to a GitHub Release (v1.1.0 is the recommended version).</td></tr>
+<tr><td>Distribution</td><td>APK attached to a GitHub Release (v1.1.1 is the recommended version).</td></tr>
 <tr><td>Web demo</td><td><code>node scripts/deploy-pages.mjs</code> exports the web build with base URL <code>/virtual-tour-calabarzon</code>, adds a <code>404.html</code> SPA fallback and <code>.nojekyll</code>, scans the bundle and force-pushes the <code>gh-pages</code> branch served by GitHub Pages.</td></tr>
 <tr><td>Quality gate</td><td>Before release: unit, live data / auth, i18n, dataset, DB verify, tsc, lint, expo-doctor, secret scan, web click-through, Android Hermes export.</td></tr>
 </tbody></table>
 
-<h2>12. Known limitations</h2>
+<h2>14. Known limitations</h2>
 <ul>
-<li>Database security is intentionally open for a classroom project (section 10); the production plan is documented, not applied.</li>
+<li>Database security is intentionally open for a classroom project (section 12); the production plan is documented, not applied.</li>
 <li>A guest's progress is tied to that installation until an account is created.</li>
 <li>Offline mode shows what was loaded once; writes (quizzes, visits, ratings) need a connection and are not queued.</li>
 <li>Destination content is English only; the interface is bilingual.</li>
-<li>The 360° button opens Google Street View for every destination. The Street View metadata API is not enabled on the project's Google key, so per-destination panorama coverage could not be curated; where Google has no panorama it shows the map.</li>
-<li>The web demo is a convenience build: the map is a schematic stand-in, haptics do nothing, narration depends on the browser's voices, and the certificate shares as text.</li>
+<li>360° coverage is curated once at build time (Google may add or remove imagery later); for places added in the app the step is shown optimistically. Some panoramas are user-contributed photospheres near, not at, the site.</li>
+<li>Road routing uses the public OSRM demo server, which has no uptime guarantee; the straight-line fallback covers outages.</li>
+<li>The web demo is a convenience build: the map is a schematic stand-in (the road route is drawn on it), the 360° view depends on the browser allowing Google's iframe, haptics do nothing, narration depends on the browser's voices, and the certificate shares as text.</li>
 <li>Release APKs are sideloaded builds, not a Google Play release.</li>
-<li>Row-level security, the starter-quiz generator's pedagogy and the planner's travel time (straight-line distance × a road factor ÷ an assumed speed) are approximations suited to the project's scope.</li>
+<li>Row-level security, the starter-quiz generator's pedagogy and the planner's fallback travel time (straight-line distance × a road factor ÷ an assumed speed, used only when road routing is unavailable) are approximations suited to the project's scope.</li>
 </ul>
 </body></html>

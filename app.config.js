@@ -22,6 +22,15 @@ if (process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PLATFORM === 'andr
   );
 }
 
+// Run 8: the in-app 360° step needs the (publishable) Maps Embed key; without
+// it the step silently disappears. Fail an EAS build that lacks it.
+if (process.env.EAS_BUILD === 'true' && !process.env.EXPO_PUBLIC_MAPS_EMBED_KEY) {
+  throw new Error(
+    'EXPO_PUBLIC_MAPS_EMBED_KEY is not set for this EAS build. Add it with ' +
+      '`eas env:create --environment preview --name EXPO_PUBLIC_MAPS_EMBED_KEY --visibility plaintext`.',
+  );
+}
+
 // Web demo on GitHub Pages is served from /virtual-tour-calabarzon/. The base
 // URL is applied only when WEB_BASE_URL is set (scripts/deploy-pages.mjs sets
 // it), so local web runs and the native builds are unaffected.
