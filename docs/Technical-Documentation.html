@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Technical Documentation — Virtual Tour &amp; Cultural Mapping (CALABARZON)</title>
+<link rel="stylesheet" href="docs.css"></head><body>
+
+<section class="cover">
+  <div class="kicker">WMA 306 · UI/UX and Cross-Platform Applications</div>
+  <h1>Virtual Tour &amp; Cultural Mapping — CALABARZON</h1>
+  <div class="sub">Technical Documentation: requirements, architecture, data model, quality assurance and release process.</div>
+  <div class="meta">
+    Version 1.1.0 (Android versionCode 3)<br>
+    Platform: Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase<br>
+    Source: github.com/clarkdesepida0154/virtual-tour-calabarzon<br>
+    Live web demo: clarkdesepida0154.github.io/virtual-tour-calabarzon<br>
+    Date: 21 November 2026
+  </div>
+</section>
+
+<section class="toc">
+  <h2 style="margin-top:0">Contents</h2>
+  <ol>
+    <li>Overview and objectives</li>
+    <li>Requirements traceability</li>
+    <li>Architecture</li>
+    <li>Database schema</li>
+    <li>Technology stack</li>
+    <li>Identity and authentication model</li>
+    <li>Offline strategy</li>
+    <li>Internationalisation and theming</li>
+    <li>Testing strategy and final results</li>
+    <li>Security notes</li>
+    <li>Build and release process</li>
+    <li>Known limitations</li>
+  </ol>
+</section>
+
+<h2>1. Overview and objectives</h2>
+<p>The application is a mobile guide to the major tourist destinations and cultural-heritage sites of <b>Region IV-A (CALABARZON)</b>, Philippines — Cavite, Laguna, Batangas, Rizal and Quezon. It is offered as an alternative to educational field trips: each destination is presented like a gallery exhibit (photo wall, history chapter, cultural-significance chapter) and followed by a short quiz written from the same text. Afterwards the app hands over to Google Maps for the real visit.</p>
+<p>The presentation tone is museum-quality and educational. Because WMA 306 grades the user interface, design consistency, accessibility and complete loading / empty / error states were treated as first-class requirements.</p>
+<h3>Objectives</h3>
+<ul>
+  <li>Deliver all Phase 1 (catalogue, CRUD, search, navigation, database) and Phase 2 (virtual tour, quiz, progress, authentication, maps) requirements on one codebase for Android, iOS and web.</li>
+  <li>Present 26 verified destinations (5 Cavite, 6 Laguna, 5 Batangas, 5 Rizal, 5 Quezon) with 78 freely licensed, credited photographs and 130 quiz questions.</li>
+  <li>Stay inside Expo Go so any phone can run the app from a QR code, and also ship a standalone Android APK.</li>
+  <li>Keep the codebase testable: data access behind repositories, logic in pure modules, every flow covered by automated checks.</li>
+</ul>
+
+<h2>2. Requirements traceability</h2>
+<p>The requirement lists are those set for the subject (Phase 1 and Phase 2). Each is mapped to where it is implemented. Paths are relative to <code>src/</code>.</p>
+<h3>Phase 1</h3>
+<table><thead><tr><th style="width:26%">Requirement</th><th>Implementation</th></tr></thead><tbody>
+<tr><td>1. Destination CRUD (add, view, edit, delete)</td><td>Add: <code>app/add.tsx</code> and Explore FAB; View: <code>app/destination/[id]/index.tsx</code>; Edit: <code>app/destination/[id]/edit.tsx</code>; Delete with confirmation on Details. Shared validated form: <code>components/form/DestinationForm.tsx</code>, rules in <code>lib/destinationForm.ts</code>; data access: <code>repositories/destinations.ts</code>.</td></tr>
+<tr><td>2. Destination information (name, description, address, category, image)</td><td>Columns of <code>destinations</code> plus <code>destination_images</code>; photo picker → resize to 1600 px → upload to the <code>destination-images</code> bucket (<code>lib/coverPhoto.ts</code>, <code>lib/base64.ts</code>). Photo credits are shown wherever a gallery photo is large.</td></tr>
+<tr><td>3. Search by name and filter by category and province</td><td>Search-as-you-type (<code>ilike</code> on name and municipality, debounced) and combinable single-select category and province chips: <code>app/(tabs)/explore.tsx</code>, <code>components/FilterChips.tsx</code>, <code>context/ExploreFiltersContext.tsx</code>. Home search and category / province shortcuts open a pre-filtered Explore.</td></tr>
+<tr><td>4. Navigation (Home → Explore → Details, Add / Edit)</td><td>Expo Router: bottom tabs Home / Explore / Map / Progress inside a root stack (<code>app/_layout.tsx</code>) that also holds Welcome, Sign In / Up, Add, Details, Edit, Tour and Quiz; typed routes.</td></tr>
+<tr><td>5. Database (Supabase)</td><td>Postgres tables, RLS and a public storage bucket defined in <code>supabase/schema.sql</code>; content in <code>data/destinations-seed.json</code>; client in <code>lib/supabase.ts</code>.</td></tr>
+</tbody></table>
+<h3>Phase 2</h3>
+<table><thead><tr><th style="width:26%">Requirement</th><th>Implementation</th></tr></thead><tbody>
+<tr><td>1. Virtual tour</td><td><code>app/destination/[id]/tour.tsx</code>: Intro → Gallery (swipeable, credited) → History → Cultural Significance → Completion (Mark as Visited, then quiz). Full screen with step indicator; empty steps are skipped. Extras: narration (<code>lib/narration.ts</code>), 360° Street View link.</td></tr>
+<tr><td>2. Quiz</td><td><code>app/destination/[id]/quiz.tsx</code>, pure engine in <code>lib/quiz.ts</code> (shuffle per attempt, scoring, result tone); 5 questions × 4 options; every attempt stored in <code>quiz_attempts</code>; best score derived.</td></tr>
+<tr><td>3. Progress tracking</td><td><code>app/(tabs)/progress.tsx</code>, <code>hooks/useProgress.ts</code>, <code>lib/progress.ts</code>: visited ring, quiz statistics, per-province bars, journey list. Extras: badges, certificates, insights.</td></tr>
+<tr><td>4. User authentication</td><td>Supabase email + password (<code>repositories/auth.ts</code>, <code>context/IdentityContext.tsx</code>), Welcome / Sign In / Sign Up, optional guest mode, protected route groups.</td></tr>
+<tr><td>5. Maps</td><td><code>app/(tabs)/map.tsx</code> with <code>components/map/</code> (react-native-maps): 26 category pins, legend filter, callouts to Details, Details map preview.</td></tr>
+</tbody></table>
+<h3>Additions beyond the specification</h3>
+<table><thead><tr><th style="width:26%">Feature</th><th>Where</th></tr></thead><tbody>
+<tr><td>Directions, Near me, favorites, share, offline catalogue, haptics, onboarding</td><td><code>lib/outbound.ts</code>, <code>context/LocationContext.tsx</code>, <code>context/FavoritesContext.tsx</code>, <code>lib/offlineCache.ts</code>, <code>app/onboarding.tsx</code></td></tr>
+<tr><td>Dark mode, Filipino UI, settings, photo credits, narration, accessibility pass</td><td><code>theme/</code>, <code>i18n/</code>, <code>app/settings.tsx</code>, <code>app/credits.tsx</code>, <code>components/NarrationButton.tsx</code></td></tr>
+<tr><td>360° view, starter quiz, badges, ratings, insights, certificate, trip planner</td><td><code>lib/outbound.ts</code>, <code>lib/quizGenerator.ts</code> + <code>autoQuiz.ts</code>, <code>lib/achievements.ts</code>, <code>repositories/ratings.ts</code>, <code>lib/insights.ts</code>, <code>lib/certificate.ts</code> + <code>certificateShare.ts</code>, <code>lib/planner.ts</code></td></tr>
+</tbody></table>
+
+<h2 class="pb">3. Architecture</h2>
+<p>The app is layered so that anything touching the network, the device or React is isolated, and everything else is a pure function that Node can test.</p>
+<figure>
+<svg width="640" height="330" viewBox="0 0 640 330" role="img" aria-label="Architecture diagram">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5A5048"/></marker></defs>
+  <g font-size="11" text-anchor="middle">
+    <rect x="10" y="10" width="620" height="62" rx="8" fill="#F6EFE2" stroke="#C9A227"/>
+    <text x="320" y="28" font-weight="700" fill="#9A3B26">PRESENTATION</text>
+    <rect x="25" y="36" width="130" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="90" y="54">Screens (src/app)</text>
+    <rect x="170" y="36" width="140" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="240" y="54">Components + theme</text>
+    <rect x="325" y="36" width="140" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="395" y="54">i18n (en / fil)</text>
+    <rect x="480" y="36" width="140" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="550" y="54">Contexts (state)</text>
+
+    <rect x="10" y="95" width="620" height="62" rx="8" fill="#F6EFE2" stroke="#C9A227"/>
+    <text x="320" y="113" font-weight="700" fill="#9A3B26">APPLICATION LOGIC</text>
+    <rect x="25" y="121" width="190" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="120" y="139">Hooks (useAsyncData …)</text>
+    <rect x="230" y="121" width="390" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="425" y="139">Pure modules (src/lib): quiz, progress, badges, planner, geo …</text>
+
+    <rect x="10" y="180" width="620" height="62" rx="8" fill="#F6EFE2" stroke="#C9A227"/>
+    <text x="320" y="198" font-weight="700" fill="#9A3B26">DATA ACCESS</text>
+    <rect x="25" y="206" width="400" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="225" y="224">Repositories (destinations, quiz, progress, favorites, ratings, auth)</text>
+    <rect x="440" y="206" width="180" height="28" rx="5" fill="#fff" stroke="#E3D9C8"/><text x="530" y="224">Offline cache (AsyncStorage)</text>
+
+    <rect x="10" y="265" width="620" height="55" rx="8" fill="#2A2420"/>
+    <text x="320" y="283" font-weight="700" fill="#C9A227">SUPABASE (cloud)</text>
+    <text x="320" y="304" fill="#FAF6EF">Postgres + Row Level Security · Storage bucket · Auth</text>
+  </g>
+  <g stroke="#5A5048" stroke-width="1.4" marker-end="url(#a)"><line x1="320" y1="72" x2="320" y2="94"/><line x1="320" y1="157" x2="320" y2="179"/><line x1="225" y1="242" x2="225" y2="264"/></g>
+</svg>
+<figcaption>Figure 1 — Application layers.</figcaption></figure>
+<h3>Principles</h3>
+<ul>
+<li><b>Repository pattern.</b> Screens and components never import supabase-js. Each repository is a factory taking a client (<code>createDestinationsRepository(client)</code>); <code>repositories/index.ts</code> binds them to the app client. The same factories run in Node in the live test scripts, so the exact production data code is tested against the real project.</li>
+<li><b>Read hooks, not a global store.</b> <code>useAsyncData</code> provides <code>loading / error / success</code>, retry, refresh and stale-response protection. After a write, <code>notifyChanged()</code> (DataSyncContext) refetches mounted screens. No Redux; a handful of small contexts (filters, sync, toast, identity, location, favorites, achievements, preferences, i18n).</li>
+<li><b>Pure modules.</b> Quiz scoring, progress statistics, badges, ratings maths, insights, certificates, the starter-quiz generator, the trip planner, geometry and the offline cache take plain data and contain no React Native imports.</li>
+<li><b>Platform files.</b> <code>Foo.web.tsx</code> twins (maps, certificate sharing) keep native-only libraries out of the web bundle.</li>
+<li><b>Lists use summaries.</b> List reads return <code>DestinationSummary</code> (no long texts); only <code>getById()</code> loads the full row. “Featured” is derived (<code>lib/featured.ts</code>), never stored.</li>
+</ul>
+
+<h2 class="pb">4. Database schema</h2>
+<p>Two artefacts define the database: <code>supabase/schema.sql</code> (structure only, re-runnable) and <code>data/destinations-seed.json</code> (content). Additive changes ship as idempotent files in <code>supabase/migrations/</code> (favorites, quiz source, ratings) applied by <code>npm run db:migrate</code>, which also guards the row counts.</p>
+<figure>
+<svg width="660" height="400" viewBox="0 0 660 400" role="img" aria-label="Entity relationship diagram">
+  <defs><marker id="m" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#5A5048"/></marker></defs>
+  <g font-size="10">
+    <g id="dest"><rect x="240" y="110" width="180" height="168" rx="6" fill="#fff" stroke="#9A3B26" stroke-width="1.5"/><rect x="240" y="110" width="180" height="22" rx="6" fill="#9A3B26"/><text x="330" y="125" fill="#fff" font-weight="700" text-anchor="middle" font-size="11">destinations</text>
+      <text x="248" y="148" font-weight="700">PK id uuid</text><text x="248" y="162">name, description, address</text><text x="248" y="176">municipality</text><text x="248" y="190">province  CHECK (5 values)</text><text x="248" y="204">category  CHECK (5 values)</text><text x="248" y="218">latitude, longitude</text><text x="248" y="232">history, cultural_significance</text><text x="248" y="246">cover_image_url</text><text x="248" y="260">created_at, updated_at (trigger)</text></g>
+    <g><rect x="10" y="10" width="190" height="86" rx="6" fill="#fff" stroke="#C9A227" stroke-width="1.5"/><rect x="10" y="10" width="190" height="20" rx="6" fill="#C9A227"/><text x="105" y="24" font-weight="700" text-anchor="middle" font-size="11">destination_images</text>
+      <text x="18" y="46" font-weight="700">PK id</text><text x="18" y="59">FK destination_id → cascade</text><text x="18" y="72">image_url, caption (photo credit)</text><text x="18" y="85">sort_order (row 0 = cover)</text></g>
+    <g><rect x="230" y="10" width="190" height="62" rx="6" fill="#fff" stroke="#C9A227" stroke-width="1.5"/><rect x="230" y="10" width="190" height="20" rx="6" fill="#C9A227"/><text x="325" y="24" font-weight="700" text-anchor="middle" font-size="11">quiz_questions</text>
+      <text x="238" y="46" font-weight="700">PK id · FK destination_id</text><text x="238" y="59">question_text, sort_order 1–5, source</text></g>
+    <g><rect x="450" y="10" width="190" height="62" rx="6" fill="#fff" stroke="#C9A227" stroke-width="1.5"/><rect x="450" y="10" width="190" height="20" rx="6" fill="#C9A227"/><text x="545" y="24" font-weight="700" text-anchor="middle" font-size="11">quiz_options</text>
+      <text x="458" y="46" font-weight="700">PK id · FK question_id → cascade</text><text x="458" y="59">option_text, is_correct</text></g>
+    <g><rect x="10" y="310" width="190" height="80" rx="6" fill="#fff" stroke="#2F5D46" stroke-width="1.5"/><rect x="10" y="310" width="190" height="20" rx="6" fill="#2F5D46"/><text x="105" y="324" fill="#fff" font-weight="700" text-anchor="middle" font-size="11">quiz_attempts</text>
+      <text x="18" y="346" font-weight="700">PK id · FK destination_id</text><text x="18" y="359">device_id (user key)</text><text x="18" y="372">score, total, taken_at</text></g>
+    <g><rect x="225" y="310" width="210" height="80" rx="6" fill="#fff" stroke="#2F5D46" stroke-width="1.5"/><rect x="225" y="310" width="210" height="20" rx="6" fill="#2F5D46"/><text x="330" y="324" fill="#fff" font-weight="700" text-anchor="middle" font-size="11">destination_completions</text>
+      <text x="233" y="346" font-weight="700">PK id · FK destination_id</text><text x="233" y="359">device_id (user key), completed_at</text><text x="233" y="372">UNIQUE (destination_id, device_id)</text></g>
+    <g><rect x="450" y="150" width="200" height="66" rx="6" fill="#fff" stroke="#2F5D46" stroke-width="1.5"/><rect x="450" y="150" width="200" height="20" rx="6" fill="#2F5D46"/><text x="550" y="164" fill="#fff" font-weight="700" text-anchor="middle" font-size="11">favorites</text>
+      <text x="458" y="186" font-weight="700">PK id · FK destination_id</text><text x="458" y="199">device_id (user key), created_at</text><text x="458" y="212">UNIQUE (destination_id, device_id)</text></g>
+    <g><rect x="450" y="236" width="200" height="80" rx="6" fill="#fff" stroke="#2F5D46" stroke-width="1.5"/><rect x="450" y="236" width="200" height="20" rx="6" fill="#2F5D46"/><text x="550" y="250" fill="#fff" font-weight="700" text-anchor="middle" font-size="11">ratings</text>
+      <text x="458" y="272" font-weight="700">PK id · FK destination_id</text><text x="458" y="285">device_id, stars CHECK 1–5</text><text x="458" y="298">created_at, updated_at (trigger)</text><text x="458" y="311">UNIQUE (destination_id, device_id)</text></g>
+  </g>
+  <g stroke="#5A5048" stroke-width="1.3" fill="none" marker-end="url(#m)">
+    <path d="M200,60 L240,125"/><path d="M330,110 L330,72"/><path d="M420,41 L450,41"/>
+    <path d="M300,278 L120,310"/><path d="M330,278 L330,310"/><path d="M420,190 L450,180"/><path d="M420,240 L450,262"/>
+  </g>
+  <text x="10" y="398" font-size="9" fill="#5A5048">Arrowheads point to the parent row (one destination → many children). All FKs cascade on delete. Green tables are keyed by a “user key” (see section 6).</text>
+</svg>
+<figcaption>Figure 2 — Entity-relationship diagram (8 tables).</figcaption></figure>
+<table><thead><tr><th style="width:22%">Table</th><th>Purpose and constraints</th></tr></thead><tbody>
+<tr><td><code>destinations</code></td><td>The catalogue. <code>province</code> and <code>category</code> are CHECK-constrained to the five provinces and five categories. <code>updated_at</code> kept fresh by a trigger.</td></tr>
+<tr><td><code>destination_images</code></td><td>Ordered photos; row 0 is the cover (same URL as <code>cover_image_url</code>); <code>caption</code> stores the licence credit line.</td></tr>
+<tr><td><code>quiz_questions</code> / <code>quiz_options</code></td><td>Five questions per destination, four options each, exactly one correct. <code>source</code> is <code>curated</code> or <code>auto</code> (starter quiz for user-added destinations). Options have no order column; the app shuffles them.</td></tr>
+<tr><td><code>quiz_attempts</code></td><td>One row per finished attempt; the best score is derived.</td></tr>
+<tr><td><code>destination_completions</code></td><td>“Visited” marks; unique per destination and user key, making Mark as Visited idempotent.</td></tr>
+<tr><td><code>favorites</code>, <code>ratings</code></td><td>Unique per destination and user key; ratings are upserted and constrained to 1–5.</td></tr>
+<tr><td>Storage bucket <code>destination-images</code></td><td>Public, 5 MB limit, JPEG / PNG / WebP. Dataset photos at <code>&lt;slug&gt;/cover.jpg</code>, <code>gallery-1.jpg</code>, <code>gallery-2.jpg</code> with a content-hash query string; photos picked in the app under <code>covers/</code>.</td></tr>
+</tbody></table>
+<p>Seeded rows get deterministic UUIDs derived from the slug, so re-seeding never changes an id. Badges, insights and certificates need no tables: they are derived from the rows above.</p>
+
+<h2>5. Technology stack</h2>
+<table><thead><tr><th style="width:28%">Area</th><th>Choice (version)</th></tr></thead><tbody>
+<tr><td>Framework</td><td>Expo SDK 58 (<code>expo ~58.0.26</code>), React Native 0.88.1, React 19.3.0 with the React Compiler</td></tr>
+<tr><td>Language</td><td>TypeScript ~6.0.3, strict mode</td></tr>
+<tr><td>Navigation</td><td>Expo Router ~58.0.32 (file-based, typed routes, <code>Stack.Protected</code> guards)</td></tr>
+<tr><td>UI</td><td>React Native Paper 5.15 (Material Design 3, custom theme), Playfair Display + Inter, Reanimated 4.7.1, react-native-svg 15.16</td></tr>
+<tr><td>Maps and device</td><td>react-native-maps 1.29.11 (Google Maps), expo-location, expo-haptics, expo-speech, expo-image, expo-image-picker / manipulator, expo-sharing, react-native-view-shot 6.1.1</td></tr>
+<tr><td>Backend</td><td>Supabase: Postgres + RLS, Storage, Auth; <code>@supabase/supabase-js ^2.119</code></td></tr>
+<tr><td>Local storage</td><td>AsyncStorage 2.2 (session, guest key, flags, preferences, offline cache, saved trip plans)</td></tr>
+<tr><td>Tooling</td><td>ESLint (expo config), Node test runner via tsx, Playwright (web click-through), EAS Build, GitHub Pages</td></tr>
+</tbody></table>
+<p>Everything used at runtime ships in Expo Go; no development build is needed.</p>
+
+<h2>6. Identity and authentication model</h2>
+<p>Progress rows carry a generic <b>user key</b> in the text column <code>device_id</code>: the Supabase auth user id when signed in, otherwise a random device UUID generated once with expo-crypto and kept in AsyncStorage. Guests and accounts share a single code path, and every progress hook includes the key in its cache key so data reloads by itself on sign-in or sign-out.</p>
+<ul>
+<li><b>Authentication.</b> Supabase email + password. The session is persisted in AsyncStorage and refreshed only while the app is in the foreground. Friendly messages come from <code>friendlyAuthMessage()</code>.</li>
+<li><b>Guest mode.</b> “Continue as guest” gives every feature. The choice is remembered, so the Welcome screen is not repeated.</li>
+<li><b>Guest → account transfer.</b> When a guest signs up, <code>transferProgress()</code> re-keys visits, attempts, favorites and ratings to the new account, resolving duplicates first (the account's own rating wins on a clash).</li>
+<li><b>Route protection.</b> <code>Stack.Protected</code> with <code>redirectTo</code>: without a session or a guest choice only Welcome, Sign In and Sign Up are reachable.</li>
+</ul>
+
+<h2>7. Offline strategy</h2>
+<p>Offline support is graceful degradation rather than synchronisation. Every successful catalogue read, each fetched destination and its photo rows are saved (<code>lib/offlineCache.ts</code>, bound to AsyncStorage in <code>lib/appCache.ts</code>). When a read fails for lack of network the saved copy answers, and filtered Explore queries are re-run locally on the saved catalogue. Photos rely on the expo-image disk cache. An <i>Offline — showing saved data</i> banner with Retry appears on Home, Explore, Map and Details. Ratings, insights and the planner behave the same way (cached averages, input hidden offline). Writes are not queued and say so. Certificates and saved trip plans work fully offline.</p>
+
+<h2>8. Internationalisation and theming</h2>
+<h3>Languages</h3>
+<p>No i18n framework: a typed dictionary per language (<code>src/i18n/en.ts</code> is the source of truth, 668 keys; <code>fil.ts</code> must match its shape or it is a type error). Components use <code>useI18n()</code> (<code>t</code>, <code>categoryLabel</code>, <code>errorMessage</code>, <code>date</code>, <code>distance</code>); plural forms and <code>{{placeholders}}</code> are supported. Pure modules return message keys, never English sentences. <code>npm run i18n:check</code> enforces identical keys / placeholders / plural shape, no empty text and no hard-coded UI strings in screens. Destination content (write-ups, quizzes) intentionally stays English, and Settings says so.</p>
+<h3>Theming</h3>
+<p>Two palettes with identical keys (<code>theme/palettes.ts</code>) are turned into Paper, navigation and Google-Maps themes by <code>buildTheme()</code>. Components build per-theme styles with <code>makeStyles()</code>; there are no literal colours or font sizes in screens (a sweep enforces it). Settings → Appearance offers System / Light / Dark with instant application, including status bars, the window background and the map style. Unit tests check token completeness and WCAG AA contrast for every text / icon pair in both palettes. Design constants (the tour's dark “gallery wall”, text over photos, the printed certificate) are identical in both themes by design.</p>
+
+<h2 class="pb">9. Testing strategy and final results</h2>
+<p>Strategy: logic is pure and unit-tested; data code is tested against the real Supabase project through the same repositories the app uses; flows are verified end to end on the web export with a headless browser; static checks and a secret scan gate every push. Tests create their own rows and clean up after themselves.</p>
+<table><thead><tr><th>Suite</th><th>Command</th><th>Final result</th></tr></thead><tbody>
+<tr><td>Unit tests</td><td><code>npm test</code></td><td><b>143 / 143</b> pass</td></tr>
+<tr><td>Data layer (live)</td><td><code>npm run db:test</code></td><td><b>50 / 50</b> pass</td></tr>
+<tr><td>Authentication (live)</td><td><code>npm run auth:test</code></td><td><b>6 / 6</b> pass</td></tr>
+<tr><td>Web click-through (e2e)</td><td><code>node scripts/web-clickthrough.mjs</code></td><td><b>205 / 205</b> pass</td></tr>
+<tr><td>Languages</td><td><code>npm run i18n:check</code></td><td>668 keys in each language, clean</td></tr>
+<tr><td>Dataset</td><td><code>npm run data:check</code></td><td>Valid; every quiz answer is in its text</td></tr>
+<tr><td>Database</td><td><code>npm run db:verify</code></td><td>26 destinations, 78 photos, 130 questions, RLS on 8 tables, photo links 200</td></tr>
+<tr><td>Static</td><td><code>npx tsc --noEmit</code> · <code>npx expo lint</code> · <code>npx expo-doctor</code></td><td>TypeScript 0 errors · ESLint 0 warnings · expo-doctor 20 / 20</td></tr>
+<tr><td>Secrets</td><td><code>npm run secrets:check</code></td><td>Clean across the working tree and full git history</td></tr>
+<tr><td>Native bundle</td><td><code>npx expo export --platform android</code></td><td>Hermes bundle builds</td></tr>
+</tbody></table>
+
+<h2>10. Security notes</h2>
+<h3>Row Level Security stance</h3>
+<p>RLS is enabled on all eight tables and on the storage bucket. For this classroom project the policies are <b>deliberately permissive</b> (select / insert / update / delete) for both <code>anon</code> (guests) and <code>authenticated</code> users, with explicit grants; this is what allows guest progress and in-app catalogue editing without a server of our own. Policy names keep an <code>_anon_</code> suffix because the verification script looks them up by name.</p>
+<h3>Production plan</h3>
+<ul>
+<li>Scope progress tables per user: <code>using (device_id = auth.uid()::text) with check (device_id = auth.uid()::text)</code> for <code>authenticated</code>.</li>
+<li>Give guests Supabase anonymous sign-in (or a signed token) instead of a client-chosen key.</li>
+<li>Restrict catalogue and storage writes to an editor role; keep catalogue reads public.</li>
+<li>Rate-limit sign-up with a custom SMTP sender and re-enable email confirmation.</li>
+</ul>
+<h3>Secret handling</h3>
+<ul>
+<li>Only <code>EXPO_PUBLIC_</code> variables are read by app code: the Supabase URL and the <b>publishable</b> key, which is designed to be public (access is governed by RLS). The secret key is never used.</li>
+<li><code>SUPABASE_DB_URL</code> is used only by setup and test scripts and is never imported by the app.</li>
+<li>The Google Maps key is read from <code>.env</code> / an EAS secret, is injected only into the native build, and is restricted in Google Cloud to the package name and the signing certificate's SHA-1.</li>
+<li><code>.env</code> is git-ignored; <code>npm run secrets:check</code> scans the tree and every commit for the DB password (raw and URL-encoded), secret keys, credentialed connection strings and Google keys before any push. The web-demo deploy script performs a similar scan of the bundle before publishing.</li>
+<li>Photos come only from Wikimedia Commons under free licences and are credited in the app.</li>
+</ul>
+
+<h2>11. Build and release process</h2>
+<table><thead><tr><th style="width:24%">Step</th><th>Detail</th></tr></thead><tbody>
+<tr><td>Versioning</td><td><code>app.json</code> holds <code>version</code> and <code>android.versionCode</code> (<code>appVersionSource: local</code>); both are bumped for each APK. v1.0.0 → v1.0.1 (launch-crash fix) → v1.1.0 (versionCode 3).</td></tr>
+<tr><td>Android APK</td><td>EAS Build, <code>preview</code> profile (<code>buildType: apk</code>), package <code>com.clark0154.virtualtour</code>, EAS-managed keystore (same signing certificate for every release so the Maps-key restriction holds). Because the project path contains an apostrophe, the build is started from a junction with <code>EAS_NO_VCS=1</code>; <code>.easignore</code> keeps photos, docs and tests out of the upload.</td></tr>
+<tr><td>Build-time configuration</td><td>The two public Supabase values and the Maps key are EAS environment variables; <code>app.config.js</code> fails an Android build that lacks the Maps key.</td></tr>
+<tr><td>R8 / minification</td><td>Disabled on purpose with keep rules in place: WorkManager (pulled in by react-native-maps) builds its Room database by reflection and crashed v1.0.0 at launch under R8.</td></tr>
+<tr><td>Distribution</td><td>APK attached to a GitHub Release (v1.1.0 is the recommended version).</td></tr>
+<tr><td>Web demo</td><td><code>node scripts/deploy-pages.mjs</code> exports the web build with base URL <code>/virtual-tour-calabarzon</code>, adds a <code>404.html</code> SPA fallback and <code>.nojekyll</code>, scans the bundle and force-pushes the <code>gh-pages</code> branch served by GitHub Pages.</td></tr>
+<tr><td>Quality gate</td><td>Before release: unit, live data / auth, i18n, dataset, DB verify, tsc, lint, expo-doctor, secret scan, web click-through, Android Hermes export.</td></tr>
+</tbody></table>
+
+<h2>12. Known limitations</h2>
+<ul>
+<li>Database security is intentionally open for a classroom project (section 10); the production plan is documented, not applied.</li>
+<li>A guest's progress is tied to that installation until an account is created.</li>
+<li>Offline mode shows what was loaded once; writes (quizzes, visits, ratings) need a connection and are not queued.</li>
+<li>Destination content is English only; the interface is bilingual.</li>
+<li>The 360° button opens Google Street View for every destination. The Street View metadata API is not enabled on the project's Google key, so per-destination panorama coverage could not be curated; where Google has no panorama it shows the map.</li>
+<li>The web demo is a convenience build: the map is a schematic stand-in, haptics do nothing, narration depends on the browser's voices, and the certificate shares as text.</li>
+<li>Release APKs are sideloaded builds, not a Google Play release.</li>
+<li>Row-level security, the starter-quiz generator's pedagogy and the planner's travel time (straight-line distance × a road factor ÷ an assumed speed) are approximations suited to the project's scope.</li>
+</ul>
+</body></html>

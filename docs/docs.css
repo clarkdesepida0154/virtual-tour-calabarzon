@@ -1,0 +1,42 @@
+:root { --ink:#2A2420; --soft:#5A5048; --terra:#9A3B26; --gold:#C9A227; --cream:#FAF6EF; --line:#E3D9C8; --panel:#F6EFE2; }
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+* { box-sizing: border-box; }
+html { font-family: "Inter","Segoe UI",system-ui,sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; }
+body { margin: 0; }
+h1,h2,h3 { font-family: "Playfair Display",Georgia,"Times New Roman",serif; color: var(--ink); line-height: 1.2; }
+h1 { font-size: 24pt; margin: 0 0 4pt; }
+h2 { font-size: 16pt; margin: 22pt 0 6pt; padding-bottom: 4pt; border-bottom: 2px solid var(--gold); break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; color: var(--terra); break-after: avoid; }
+p { margin: 5pt 0; }
+a { color: var(--terra); text-decoration: none; }
+code { font-family: "Cascadia Mono",Consolas,monospace; font-size: 9pt; background: var(--panel); padding: 0 3pt; border-radius: 3pt; }
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 6pt; padding: 8pt; font-size: 8.5pt; overflow: hidden; white-space: pre-wrap; break-inside: avoid; }
+table { width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 9.5pt; break-inside: auto; }
+th { background: var(--terra); color: #fff; text-align: left; padding: 5pt 6pt; font-weight: 600; }
+td { border-bottom: 1px solid var(--line); padding: 4pt 6pt; vertical-align: top; }
+tr { break-inside: avoid; }
+tbody tr:nth-child(even) td { background: #FBF8F2; }
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; padding: 0 10mm; border-left: 8px solid var(--terra); break-after: page; }
+.cover .kicker { letter-spacing: .18em; text-transform: uppercase; color: var(--gold); font-weight: 700; font-size: 9.5pt; }
+.cover h1 { font-size: 34pt; margin: 8pt 0; }
+.cover .sub { font-size: 13pt; color: var(--soft); max-width: 120mm; }
+.cover .meta { margin-top: 30pt; font-size: 10pt; color: var(--soft); line-height: 1.8; }
+.toc { break-after: page; }
+.toc ol { columns: 2; padding-left: 16pt; }
+.note { background: var(--panel); border-left: 4px solid var(--gold); padding: 6pt 10pt; border-radius: 4pt; margin: 8pt 0; break-inside: avoid; }
+.pill { display: inline-block; background: var(--panel); border: 1px solid var(--line); border-radius: 10pt; padding: 0 6pt; font-size: 8.5pt; }
+figure { margin: 10pt 0; text-align: center; break-inside: avoid; }
+figcaption { font-size: 8.5pt; color: var(--soft); margin-top: 3pt; }
+svg text { font-family: "Inter","Segoe UI",sans-serif; }
+.pb { break-before: page; }
+/* user manual */
+.screen { display: grid; grid-template-columns: 52mm 1fr; gap: 10mm; break-inside: avoid; margin: 10pt 0 16pt; align-items: start; }
+.screen img { width: 52mm; border: 1px solid var(--line); border-radius: 8pt; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.screen .shots { display: flex; flex-direction: column; gap: 6pt; }
+.screen h3 { margin-top: 0; }
+.screen ul { margin: 4pt 0; padding-left: 14pt; }
+/* wireframes */
+.wf-page { break-after: page; display: grid; grid-template-columns: 1fr; justify-items: center; }
+.wf-page:last-child { break-after: auto; }
+.wf-page h2 { width: 100%; margin-top: 0; }
+.wf-cap { width: 100%; color: var(--soft); margin-bottom: 8pt; }

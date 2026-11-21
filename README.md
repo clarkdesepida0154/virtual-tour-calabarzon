@@ -3,7 +3,17 @@
 **A museum-style mobile guide to 26 heritage sites and natural landmarks of
 Region IV-A, Philippines — built as a field trip you can take from a phone.**
 
-Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android & iOS
+[![Version](https://img.shields.io/badge/version-1.1.0-9A3B26)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0) [![Live demo](https://img.shields.io/badge/live%20demo-GitHub%20Pages-C9A227)](https://clarkdesepida0154.github.io/virtual-tour-calabarzon/)
+
+**▶ Live web demo: https://clarkdesepida0154.github.io/virtual-tour-calabarzon/**
+· **⬇ Android APK: [v1.1.0 (recommended)](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0)**
+· **📄 Docs: [Technical Documentation](docs/Technical-Documentation.pdf) · [User Manual](docs/User-Manual.pdf) · [Wireframes](docs/Wireframes.pdf)**
+
+Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android, iOS & web
+
+> The web demo is a quick-look build: the map is a schematic stand-in, there is
+> no haptic feedback, narration depends on the browser's voices, and the
+> certificate shares as text. The Android app has the full experience.
 
 <table>
   <tr>
@@ -23,6 +33,12 @@ Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android &
     <td align="center"><img src="docs/screenshots/details-dark.jpg" width="190" alt="Destination details in the dark theme"><br><sub>Dark theme · Details</sub></td>
     <td align="center"><img src="docs/screenshots/explore-filipino.jpg" width="190" alt="Explore with the Filipino interface"><br><sub>Filipino UI · Tuklasin</sub></td>
     <td align="center"><img src="docs/screenshots/settings.jpg" width="190" alt="Settings: appearance, language and narration"><br><sub>Settings</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/ui/44-r6-tour-360.jpg" width="190" alt="Tour gallery with the 360 degree card"><br><sub>360° Street View</sub></td>
+    <td align="center"><img src="docs/screenshots/ui/48-r6-badges.jpg" width="190" alt="Badges grid"><br><sub>Badges</sub></td>
+    <td align="center"><img src="docs/screenshots/ui/49-r6-certificate.jpg" width="190" alt="Certificate of completion"><br><sub>Certificate</sub></td>
+    <td align="center"><img src="docs/screenshots/ui/53-r6-planner-plan.jpg" width="190" alt="Field trip planner route"><br><sub>Field trip planner</sub></td>
   </tr>
 </table>
 
@@ -71,6 +87,20 @@ error states were treated as first-class requirements rather than polish.
 - **Share** — the native share sheet with the name, a one-line description and
   "Town • Province".
 
+**Go further** (v1.1.0)
+- **360° view** — opens Google Street View at the destination (Details and the
+  tour gallery).
+- **Starter quiz for your own entries** — add a destination and the app writes
+  a five-question quiz from your fields; edits regenerate it.
+- **Badges and certificates** — ten achievements derived from your activity,
+  a once-only celebration banner, and a shareable **Certificate of Completion**
+  per province or for the whole region (shared as an image).
+- **Ratings and Heritage Insights** — rate places 1–5 stars; see most visited,
+  top rated and toughest quizzes across all users.
+- **Field trip planner** — choose up to 8 stops, get a nearest-neighbour
+  order, adjust it, see distances and a rough time, then open the route in
+  Google Maps; plans save on the phone.
+
 **Track**
 - **Progress** — visited count out of 26, quiz statistics, a completion bar
   per province, and a "Your journey" timeline.
@@ -112,7 +142,7 @@ error states were treated as first-class requirements rather than polish.
 | App | [Expo](https://expo.dev) SDK 58, React Native 0.88, React 19 with the React Compiler, TypeScript in strict mode |
 | Navigation | Expo Router (file-based) — a root stack with protected route groups around four bottom tabs; typed routes |
 | UI | React Native Paper (Material Design 3) re-themed with custom tokens; Playfair Display + Inter; Reanimated for step transitions; react-native-svg for the progress ring |
-| Maps & device | react-native-maps (Google Maps on Android), expo-location, expo-haptics, expo-speech, expo-image (with disk cache), expo-image-picker / manipulator |
+| Maps & device | react-native-maps (Google Maps on Android), expo-location, expo-haptics, expo-speech, expo-image (with disk cache), expo-image-picker / manipulator, expo-sharing + react-native-view-shot (certificate image) |
 | Backend | [Supabase](https://supabase.com): Postgres with Row Level Security, Storage for photos, Auth (email + password) |
 | Local storage | AsyncStorage for the session, the guest key, one-time flags and the offline catalogue |
 | Tooling | ESLint (expo config), Node's built-in test runner via tsx, Playwright for the web click-through, EAS Build for the APK |
@@ -183,6 +213,7 @@ the content. Additive changes ship as idempotent files in
 | `quiz_attempts` | One row per finished quiz, by user key |
 | `destination_completions` | "Visited" marks, unique per destination and user key |
 | `favorites` | Hearted destinations, unique per destination and user key |
+| `ratings` | 1–5 star ratings, unique per destination and user key |
 
 All child tables cascade on delete. Row Level Security is enabled on every
 table. For this school project the policies are intentionally permissive for
@@ -192,8 +223,10 @@ catalogue edits to editors.
 
 ## Getting started
 
-**Try it:** the Android APK is attached to the
-[latest release](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/latest).
+**Try it:** open the [live web demo](https://clarkdesepida0154.github.io/virtual-tour-calabarzon/),
+or install the Android APK from the
+[v1.1.0 release](https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.0)
+(the recommended version; v1.0.0 had a launch crash).
 
 **Run it from source** (Node.js 20+, the Expo Go app on a phone):
 
@@ -226,19 +259,21 @@ network, allow Node.js through the firewall, or use `npx expo start --tunnel`.
 (see `eas.json`; the Supabase values and the Maps key are supplied as EAS
 environment variables).
 
+**Redeploy the web demo:** `node scripts/deploy-pages.mjs` (exports with the
+Pages base URL, adds the `404.html` fallback and publishes `gh-pages`).
+
 ## Testing
 
 | Suite | Command | What it covers | Checks |
 | --- | --- | --- | --- |
-| Unit | `npm test` | Quiz scoring and shuffling, best scores, progress statistics, auth validation, distances, favorites, offline cache, directions and share text, theme token completeness and WCAG contrast in both themes, i18n dictionaries and translator, narration state machine, settings parsing, photo credits | 73 |
-| Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage upload, quiz rows, attempts, visits, favorites (idempotency, isolation, cascade), guest → account transfer, photo credits. Cleans up after itself | 39 |
-| Auth (live) | `npm run auth:test` | Sign-in and sign-out, signed-in RLS, progress under the auth user id, friendly errors, with a temporary user | 6 |
-| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build: onboarding, Welcome, guest, Near me, favorites, share, directions, tour with narration, quiz, map, progress, offline banner, Settings, dark mode (background sampled on five screens), Filipino UI, Photo Credits, sign in / out, session restore | 134 |
-| Languages | `npm run i18n:check` | 490 keys in English and Filipino: same keys, placeholders and plural forms, no empty text, and no hard-coded UI text left in screens or components | — |
-| Dataset | `npm run data:check` | Schema of the content file, and that every quiz answer appears in its destination's text | — |
-| Database | `npm run db:verify` | Tables, RLS policies, the 26 destinations, 78 photos and 130 questions, live photo links | — |
-| Static | `npm run typecheck` · `npm run lint` · `npx expo-doctor` | Strict TypeScript, ESLint, 20 Expo project checks | — |
-| Secrets | `npm run secrets:check` | No password, secret key or credentialed connection string in any file or any commit | — |
+| Unit | `npm test` | Quiz scoring and shuffling, progress, auth validation, distances, favorites, offline cache, directions / Street View / share links, theme tokens and WCAG contrast in both themes, i18n, narration state machine, starter-quiz generator, badges, ratings, insights, certificates, planner, certificate sharing flow | 143 |
+| Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage, quizzes, attempts, visits, favorites, ratings, starter quizzes, guest → account transfer. Cleans up after itself | 50 |
+| Auth (live) | `npm run auth:test` | Sign-in / sign-out, signed-in RLS, progress under the auth user id, friendly errors, with a temporary user | 6 |
+| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build in both themes and both languages, including every Run 6 module | 205 |
+| Languages | `npm run i18n:check` | 668 keys in English and Filipino: same keys, placeholders and plurals; no hard-coded UI text | — |
+| Dataset / database | `npm run data:check` · `npm run db:verify` | Dataset schema and answerable quizzes; 8 tables with RLS, 26 destinations, 78 photos, 130 questions, live photo links | — |
+| Static | `npm run typecheck` · `npm run lint` · `npx expo-doctor` | Strict TypeScript, ESLint, 20 / 20 Expo checks | — |
+| Secrets | `npm run secrets:check` | No password, secret key or credentialed connection string in any file or commit | — |
 
 ## Content and image licensing
 
@@ -272,6 +307,13 @@ scripts/               Setup, seeding, migrations, live tests, photo curation, s
 tests/                 Unit tests
 ```
 
+## Documentation
+
+- [Technical Documentation (PDF)](docs/Technical-Documentation.pdf) — requirements traceability, architecture, ERD, stack, identity, offline, i18n / theming, testing, security, release
+- [User Manual (PDF)](docs/User-Manual.pdf) — per-screen walkthrough, installation, FAQ
+- [Wireframes (PDF)](docs/Wireframes.pdf) — low-fidelity layouts of every screen
+- HTML sources sit next to the PDFs in [`docs/`](docs/); rebuild with `node scripts/build-docs.mjs`
+
 ## Roadmap
 
 - **Filipino content** — translate the 26 write-ups and their quizzes (the
@@ -287,5 +329,8 @@ tests/                 Unit tests
 - A guest's progress is tied to that installation until they create an account.
 - Offline mode shows destinations already loaded once; quizzes and progress
   updates need a connection.
-- The web build is used for automated testing only; its map is a schematic
-  stand-in because native Google Maps runs only on the phone.
+- The web demo is a convenience build: its map is a schematic stand-in because
+  native Google Maps runs only on the phone, and it has no haptics.
+- The 360° button opens Google Street View for every destination; where Google
+  has no panorama it shows the map (coverage could not be pre-checked because
+  the Street View metadata API is not enabled for the project's key).

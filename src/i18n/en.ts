@@ -552,6 +552,8 @@ export const en = {
       project: 'A WMA 306 — UI/UX and Cross-Platform Applications project.',
       repo: 'Source code on GitHub',
       repoHint: 'Opens the project’s GitHub page',
+      webDemoTitle: 'Web demo',
+      webDemoBody: 'You are using the browser version. The map is a schematic stand-in, and haptics, narration voices and location depend on your browser. The Android app has the full experience.',
     },
     legal: {
       title: 'Legal',

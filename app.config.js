@@ -22,8 +22,14 @@ if (process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PLATFORM === 'andr
   );
 }
 
+// Web demo on GitHub Pages is served from /virtual-tour-calabarzon/. The base
+// URL is applied only when WEB_BASE_URL is set (scripts/deploy-pages.mjs sets
+// it), so local web runs and the native builds are unaffected.
+const webBaseUrl = process.env.WEB_BASE_URL || undefined;
+
 module.exports = ({ config }) => ({
   ...config,
+  experiments: { ...(config.experiments ?? {}), ...(webBaseUrl ? { baseUrl: webBaseUrl } : {}) },
   plugins: [
     ...(config.plugins ?? []),
     ['react-native-maps', { androidGoogleMapsApiKey: mapsKey }],

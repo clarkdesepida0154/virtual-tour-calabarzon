@@ -551,6 +551,8 @@ export const fil: DictionaryShape<EnglishDictionary> = {
       project: 'Isang proyekto sa WMA 306 — UI/UX and Cross-Platform Applications.',
       repo: 'Source code sa GitHub',
       repoHint: 'Bubuksan ang GitHub page ng proyekto',
+      webDemoTitle: 'Web demo',
+      webDemoBody: 'Browser version ang ginagamit mo. Schematic lang ang mapa, at depende sa browser mo ang haptics, boses ng narration at lokasyon. Nasa Android app ang buong karanasan.',
     },
     legal: {
       title: 'Legal',

@@ -11,6 +11,7 @@ import { AppText } from '@/components/AppText';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { WebDemoNotice } from '@/components/WebDemoNotice';
 import { REPOSITORY_URL } from '@/constants/links';
 import { useI18n } from '@/context/I18nContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -132,6 +133,7 @@ export default function SettingsScreen() {
           <AppText variant="body" color="inkSoft">
             {t('settings.about.project')}
           </AppText>
+          <WebDemoNotice />
           <LinkRow
             icon="github"
             label={t('settings.about.repo')}

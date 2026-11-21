@@ -244,13 +244,13 @@ change**: the 134 earlier click-through checks still pass unchanged.
    app line — using the `parchment*` design constants, so it stays cream in
    both themes. Holder: the name typed on the screen
    (`vtour.certificateName`), else the email prefix, else "Guest Explorer".
-   Share: `src/lib/certificateShare.ts` captures with
-   **react-native-view-shot** (`captureRef`, PNG) → iOS shares the image;
-   **Android shares a text message** (React Native's `Share` carries text
-   only on Android, and this run allowed no other native module —
-   installing expo-sharing was refused). Web: `certificateShare.web.ts`
-   (text only; view-shot's web capture needs `html2canvas-pro`, which would
-   break the web export).
+   Share (Run 7): `src/lib/certificateShare.ts` captures with
+   **react-native-view-shot** (`captureRef`, PNG) → **expo-sharing**
+   `shareAsync` on iOS and Android alike; the text message is only the
+   fallback when `Sharing.isAvailableAsync()` is false. The flow is the pure
+   `shareCertificate()` in `certificateShareFlow.ts` (injected sharer,
+   unit-tested). Web: `certificateShare.web.ts` (text only; view-shot's web
+   capture needs `html2canvas-pro`, which would break the web export).
 7. **Field Trip Planner** — `/planner`, from a Map header button
    (`map-marker-path`) and a Home card. Select: searchable checklist
    (`role=checkbox`, selection order numbered), counter "n of 8 stops ·
@@ -374,7 +374,7 @@ Semantic tokens to know:
 
 ### Languages (Run 5)
 
-- `src/i18n/en.ts` is the source of truth (666 keys since Run 6; 490 in Run 5); `src/i18n/fil.ts` has
+- `src/i18n/en.ts` is the source of truth (668 keys since Run 7; 666 in Run 6; 490 in Run 5); `src/i18n/fil.ts` has
   the same shape (`DictionaryShape<…>`, so a missing key is a type error).
   Filipino = everyday Taglish UI Filipino ("I-save", "Mga Paborito",
   "Tuklasin"); proper nouns stay.
@@ -560,7 +560,9 @@ the direct host is IPv6-only and does not.
 | `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Run 6 adds 11 live checks (50 in all): every dataset question curated; create → 5-question starter quiz; regeneration on a quiz-field edit (old rows and options gone), none on an address edit; curated untouched; cascade; ratings upsert, unique + 1–5 check, per-key isolation, average, transfer dedupe; insights / badges / certificates from live rows. Cleans up after itself. |
 | `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
 | `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
-| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134; **Run 6: 205/205** (the 134 earlier checks first, unchanged, then 71 for 360°, ratings, badges + celebration, certificate in light and dark, insights, the planner and an auto-quiz destination added through the form and deleted again) (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134; **Run 6 and Run 7: 205/205** (the 134 earlier checks first, unchanged, then 71 for 360°, ratings, badges + celebration, certificate in light and dark, insights, the planner and an auto-quiz destination added through the form and deleted again) (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
+| `node scripts/deploy-pages.mjs` | Run 7. Exports the web build with the Pages base URL, adds `404.html` + `.nojekyll`, scans the bundle for secrets, force-pushes `gh-pages`. `--build` only exports to `dist-pages/`. |
+| `node scripts/build-docs.mjs` | Run 7. Prints `docs/{Technical-Documentation,User-Manual,Wireframes}.html` to PDF with headless Chromium (needs `PLAYWRIGHT_MODULE` / `PLAYWRIGHT_CHROMIUM` as above). |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
 | `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
 | `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
@@ -791,12 +793,20 @@ assets/                Icons, splash emblem (sources in assets/brand)
   view-shot import in a native-only file with a `.web.ts` twin
   (`certificateShare.ts` / `.web.ts`).
 - **React Native `Share` on Android carries text only** (`message`); `url`
-  is iOS-only. Sharing an image file on Android needs a module such as
-  expo-sharing (in Expo Go) — not added in Run 6 (the run allowed only
-  view-shot; the install was refused), so Android shares text.
+  is iOS-only. Sharing an image file needs expo-sharing (in Expo Go) — added
+  in Run 7; it needs no config plugin.
+- **GitHub Pages**: project pages are served from `/virtual-tour-calabarzon/`,
+  so the web export needs `experiments.baseUrl` (set by `app.config.js` only
+  when `WEB_BASE_URL` is present — `scripts/deploy-pages.mjs` sets it), a
+  `404.html` copy of `index.html` (SPA fallback) and a `.nojekyll` file (the
+  `_expo` folder would otherwise be ignored). supabase-js's bundle contains the
+  literal `sb_secret_`, so the deploy scan looks for a real key shape.
+- Long Playwright runs while another heavy job is running can flake on fixed
+  waits (Run 7: the favorites un-heart check, 1.5 s) — re-run before debugging.
 - **Street View metadata** (`maps.googleapis.com/maps/api/streetview/metadata`)
   answers `REQUEST_DENIED` with our Maps key (API not enabled in its Google
-  Cloud project). The pano URL needs no key, so the feature does not depend
+  Cloud project; re-tried in Run 7, same answer — the 360° button ships for
+  all destinations). The pano URL needs no key, so the feature does not depend
   on it.
 - Web click-through: Paper dialogs fade in — wait ~800 ms before clicking
   inside one; and wait for a pushed screen's heading before typing into
@@ -892,17 +902,55 @@ Run 6 (feature modules)
 - [x] Field Trip Planner (nearest-neighbour order, reorder, route map, Google Maps hand-off, saved plans)
 - [x] QA: 138 unit, 50 db:test, 6 auth:test, 205 web click-through, i18n 666 keys, tsc, lint, expo-doctor 20/20, Android Hermes export
 
-Next (Run 7)
+Run 7 (ship run) — complete
 
-- [ ] Final QA + device pass for Runs 5–6 (both themes, Filipino, narration, native pins, Run 6 list below)
-- [ ] APK v1.1.0 (bump `version` + `android.versionCode`), GitHub Release
-- [ ] Documentation, wireframes, web demo deploy
-- [ ] Decide on image sharing for Android certificates (expo-sharing, Expo Go-supported) — needs the architect's OK
-- [ ] Owner (optional): enable the Street View Static API on the Maps key's project if per-destination 360° curation is wanted
+- [x] Device feedback: owner reported none (Runs 5–6 to be device-tested on the v1.1.0 APK)
+- [x] Certificate shared as an image on Android (expo-sharing), text only as fallback
+- [x] Street View curation retried: still `REQUEST_DENIED` → 360° ships for all 26 (no `has_panorama` flag)
+- [x] Final QA: 143 unit, 50 db:test, 6 auth:test, 205 web click-through, 668 i18n keys, data:check, db:verify, secrets:check, tsc, lint (0 warnings), expo-doctor 20/20, Android Hermes export
+- [x] APK v1.1.0 (versionCode 3, same keystore SHA-1) on GitHub Releases (Latest)
+- [x] Web demo on GitHub Pages: https://clarkdesepida0154.github.io/virtual-tour-calabarzon/
+- [x] Documentation package (`docs/`): Technical-Documentation, User-Manual, Wireframes (PDF + HTML sources)
+- [x] README refresh (live demo, v1.1.0, docs, new screenshots)
+
+**The roadmap is complete.** Remaining owner-side optional items: restrict the
+Google Maps key to the package name + SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`
+(if not already done); enable the Street View Static API if per-destination
+360° curation is ever wanted (then add a `has_panorama` flag to the dataset and
+gate the button on it, always showing it for user-added destinations).
+
+## Maintenance notes
+
+- **Reseed content**: edit `data/destinations-seed.json` → `npm run data:check`
+  → `npm run db:seed` (destructive: removes attempts, visits, favorites,
+  ratings). For photos only use `npm run db:sync-photos`. Additive schema
+  changes: add a file to `supabase/migrations/` and run `npm run db:migrate`
+  (never `db:setup` on the live project). Then `npm run db:verify` and
+  `npm run db:test`.
+- **Rebuild the APK**: bump `version` and `android.versionCode` in `app.json`
+  (and `package.json` version), commit, then
+  `cd /c/dev/vtour && EAS_NO_VCS=1 npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`
+  (junction `C:\dev\vtour` → this folder; recreate with `mklink /J` if
+  missing). Poll with `npx eas-cli@latest build:view <id>`, download the APK
+  to `dist/virtual-tour-calabarzon-vX.Y.Z.apk`, confirm package / version /
+  Maps-key meta / v2 signing SHA-1 (unchanged, see above) and attach it to a
+  GitHub Release. Test the standalone APK on a phone before announcing it.
+- **Redeploy the web demo**: `node scripts/deploy-pages.mjs` (needs the `.env`
+  public values; pushes `gh-pages`; Pages serves it a minute later). Verify
+  the live URL: Home renders, Explore lists destinations, a Details page and a
+  deep-link reload both work.
+- **Regenerate docs**: update the HTML in `docs/`, refresh screenshots by
+  running the click-through with a screenshots dir (`node
+  scripts/web-clickthrough.mjs <dist> <dir>`, then convert to JPG into
+  `docs/screenshots/ui`), then `node scripts/build-docs.mjs`.
+- **Before any push**: `npm run secrets:check`; before a release the full QA
+  set listed under Run 7.
+- **Auth**: "Confirm email" is OFF in the Supabase dashboard (sign-ups sign
+  straight in). The built-in mailer is rate-limited if it is turned back on.
 
 ## Not yet verified on a device
 
-**Run 6 is web- and test-verified only.** Phone-only parts: the Street View
+**Runs 5–6 are web- and test-verified only; the owner will device-test the v1.1.0 APK after Run 7 (including certificate image sharing via expo-sharing on Android).** **Run 6 is web- and test-verified only.** Phone-only parts: the Street View
 hand-off (Google Maps app opening the pano; what Google shows where there is
 no panorama), the certificate capture with react-native-view-shot and the
 share sheet (image on iOS, text on Android), the planner's native map
