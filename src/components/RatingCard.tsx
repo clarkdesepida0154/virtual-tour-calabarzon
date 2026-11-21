@@ -10,6 +10,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { StarRatingInput } from '@/components/StarRating';
+import { useDataSync } from '@/context/DataSyncContext';
 import { useI18n } from '@/context/I18nContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
@@ -28,6 +29,7 @@ export function RatingCard({ destinationId }: { destinationId: string }) {
   const { t, errorMessage } = useI18n();
   const { userKey } = useIdentity();
   const { showToast } = useToast();
+  const { notifyChanged } = useDataSync();
   const offline = useShowingSavedData();
   const query = useDestinationRating(destinationId);
   // The tap shows at once; the saved value replaces it after the reload.
@@ -47,7 +49,8 @@ export function RatingCard({ destinationId }: { destinationId: string }) {
     try {
       await ratingsRepository.rate(userKey, destinationId, stars);
       showToast(t('ratings.saved'));
-      query.retry();
+      // Every screen reloads, so the Explore cards and Insights show the new average.
+      notifyChanged();
     } catch (cause) {
       setOptimistic(null);
       showToast(errorMessage(toAppError(cause, 'saveRating')));

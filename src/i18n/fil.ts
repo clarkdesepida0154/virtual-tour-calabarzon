@@ -608,7 +608,6 @@ export const fil: DictionaryShape<EnglishDictionary> = {
     viewCertificate: 'Tingnan ang sertipiko',
     viewCertificateA11y: 'Tingnan ang sertipiko ng {{title}}',
     loadingA11y: 'Nilo-load ang mga badge mo',
-    summary: { one: '{{count}} badge ang nakuha', other: '{{count}} badge ang nakuha' },
     badges: {
       firstJourney: { title: 'Unang Paglalakbay', description: 'Markahang napuntahan ang una mong destinasyon.' },
       explorerCavite: { title: 'Manlalakbay ng Cavite', description: 'Bisitahin ang lahat ng {{count}} destinasyon sa Cavite.' },

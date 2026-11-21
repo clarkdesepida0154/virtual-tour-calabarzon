@@ -609,7 +609,6 @@ export const en = {
     viewCertificate: 'View certificate',
     viewCertificateA11y: 'View the {{title}} certificate',
     loadingA11y: 'Loading your badges',
-    summary: { one: '{{count}} badge earned', other: '{{count}} badges earned' },
     badges: {
       firstJourney: { title: 'First Journey', description: 'Mark your first destination as visited.' },
       explorerCavite: { title: 'Cavite Explorer', description: 'Visit all {{count}} destinations in Cavite.' },

@@ -435,7 +435,7 @@ export default function PlannerScreen() {
                     </AppText>
                   </View>
                   <View style={styles.flex} accessible accessibilityLabel={t('planner.stopA11y', { index: index + 1, name: stop.name })}>
-                    <AppText variant="subtitle" numberOfLines={2}>
+                    <AppText variant="subtitle" numberOfLines={3}>
                       {stop.name}
                     </AppText>
                     {leg ? (

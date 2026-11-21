@@ -24,6 +24,15 @@
  * in auth.users through SUPABASE_DB_URL (setup-script privilege). Every
  * progress row and the test user are deleted at the end, also on failure.
  *
+ * Run 6 adds (after every earlier flow, signed in as the throwaway user):
+ * the 360° Street View link (Details + tour Gallery card), star ratings
+ * (tap, upsert, average, Explore card), badges (Cavite visits written to the
+ * database → once-only celebration → grid), the certificate (light + dark
+ * parchment, typed name, share), Heritage Insights, the field-trip planner
+ * (select → suggested order → reorder → Google Maps URL → save / delete) and
+ * an auto-generated starter quiz for a destination added through the form
+ * (deleted again).
+ *
  * Web cannot show native Google Maps: the Map tab is checked against its web
  * stand-in (DestinationMap.web.tsx).
  */
@@ -97,6 +106,8 @@ async function clickActionable(locator) {
 const db = await connect({ log: () => {} });
 const EMAIL = `vtour-ui-check-${Date.now()}@example.com`;
 const PASSWORD = 'UiCheck-2026-pass';
+/** Run 6: the destination the click-through adds through the form (deleted again). */
+const AUTO_NAME = `UI check Casa Tejeros ${Date.now()}`;
 let testUserId = null;
 let guestKey = null;
 let guestKey2 = null;
@@ -601,6 +612,8 @@ try {
   await page.getByRole('tab', { name: /Progress/ }).click();
   await page.mouse.wheel(0, -2000);
   await page.getByRole('button', { name: /^Sign in$/ }).first().click();
+  // Wait for the Sign In screen before typing (otherwise a hidden tab's search box can be filled).
+  await page.getByRole('heading', { name: 'Sign In' }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
   await page.locator('input:visible').nth(0).fill(EMAIL);
   await page.locator('input:visible').nth(1).fill('wrong-password');
   await page.getByRole('button', { name: /^Sign in$/ }).last().click();
@@ -629,6 +642,285 @@ try {
   await page.reload();
   await page.getByRole('tab', { name: /Progress/ }).click();
   await expectVisible(page, page.getByLabel(`Signed in as ${EMAIL}`), 'Session persists across a reload (AsyncStorage)');
+
+  // ===========================================================================
+  // Run 6 feature modules (signed in as the throwaway account). The legacy
+  // flows above ran first, unchanged.
+  // ===========================================================================
+  results.push('info  --- Run 6 feature modules ---');
+  const goTab = async (name) => {
+    await page.getByRole('tab', { name }).click();
+    await page.waitForTimeout(500);
+  };
+  const lastOpened = () => page.evaluate(() => window.__opened.at(-1) ?? null);
+
+  // R6-1. 360° view on Details and on the tour's Gallery step
+  await goTab(/Explore/);
+  await page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('button', { name: /View in 360°/ }), '360°: "View in 360°" on Details');
+  await page.getByRole('button', { name: /View in 360°/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(300);
+  const pano = await lastOpened();
+  results.push(
+    /^https:\/\/www\.google\.com\/maps\/@\?api=1&map_action=pano&viewpoint=14\.445,120\.9069$/.test(pano ?? '')
+      ? `ok    360°: Details opens the Street View pano URL (${pano.split('viewpoint=')[1]})`
+      : `FAIL  360° URL: ${pano}`,
+  );
+  await text(page, 'Start Virtual Tour').filter({ visible: true }).first().click();
+  await text(page, 'Begin the tour').filter({ visible: true }).first().click();
+  const tourPano = page.getByLabel('View Aguinaldo Shrine in 360 degrees in Google Street View');
+  await expectVisible(page, tourPano, '360°: "View in 360°" card on the tour Gallery step');
+  await page.waitForTimeout(900);
+  await shot(page, 'r6-tour-360');
+  await tourPano.filter({ visible: true }).first().click();
+  await page.waitForTimeout(300);
+  results.push(/map_action=pano&viewpoint=14\.445,120\.9069$/.test((await lastOpened()) ?? '') ? 'ok    360°: tour card opens the same pano URL' : `FAIL  tour 360 URL: ${await lastOpened()}`);
+  await text(page, 'Continue').filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Chapter I'), '360°: the tour still goes Gallery → Chapter I (no extra step)');
+  await page.getByLabel('Close the tour').click();
+
+  // R6-2. Star ratings on Details, then on the Explore card
+  const rate4 = page.getByRole('radio', { name: 'Rate 4 stars out of 5' }).filter({ visible: true });
+  await expectVisible(page, page.getByRole('heading', { name: 'Rate this destination' }), 'Ratings: "Rate this destination" on Details');
+  await expectVisible(page, text(page, 'No ratings yet — be the first.'), 'Ratings: empty state before the first rating');
+  await rate4.first().scrollIntoViewIfNeeded();
+  await rate4.first().click();
+  await expectVisible(page, text(page, 'Your rating: 4 of 5'), 'Ratings: own rating highlighted after a tap');
+  await expectVisible(page, page.getByLabel('Rated 4.0 out of 5 from 1 ratings'), 'Ratings: average 4.0 from 1 rating');
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-rating');
+  await page.getByRole('radio', { name: 'Rate 5 stars out of 5' }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Your rating: 5 of 5'), 'Ratings: tapping again changes the rating');
+  await page.waitForTimeout(1500);
+  const ratingRows = await db.query('select stars from public.ratings where device_id = $1', [testUserId]);
+  results.push(
+    ratingRows.rows.length === 1 && ratingRows.rows[0].stars === 5
+      ? 'ok    Ratings: one row in Supabase, upserted to 5 stars'
+      : `FAIL  rating rows: ${JSON.stringify(ratingRows.rows)}`,
+  );
+  await expectVisible(page, page.getByLabel('Rated 5.0 out of 5 from 1 ratings'), 'Ratings: average follows the edit (5.0)');
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await goTab(/Explore/);
+  await expectVisible(page, page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).getByLabel('Rated 5.0 out of 5 from 1 ratings'), 'Ratings: Explore card shows ★ 5.0 (1)');
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-explore-rating');
+
+  // R6-3. Badges: five Cavite visits (written straight to the database) earn
+  // First Journey + Cavite Explorer; the celebration fires once.
+  await db.query(
+    `insert into public.destination_completions (destination_id, device_id, completed_at)
+       select id, $1, now() - (row_number() over (order by name)) * interval '1 hour' from public.destinations where province = 'Cavite'`,
+    [testUserId],
+  );
+  await page.reload();
+  await goTab(/Progress/);
+  await expectVisible(page, page.getByLabel('New badge earned: First Journey'), 'Badges: celebration banner for the newly earned badge');
+  await expectVisible(page, text(page, '+1 more badge'), 'Badges: banner counts the second new badge');
+  await page.waitForTimeout(400);
+  await shot(page, 'r6-badge-celebration');
+  await page.getByLabel('Dismiss').filter({ visible: true }).first().click();
+  const seenStored = await page.evaluate((key) => localStorage.getItem(`vtour.badgesSeen.${key}`), testUserId);
+  results.push(/first-journey/.test(seenStored ?? '') && /explorer-cavite/.test(seenStored ?? '') ? 'ok    Badges: "seen" saved on the device' : `FAIL  seen badges: ${seenStored}`);
+  await page.reload();
+  await goTab(/Progress/);
+  await page.waitForTimeout(3000);
+  const bannerAgain = await page.getByLabel('New badge earned: First Journey').isVisible().catch(() => false);
+  results.push(bannerAgain ? 'FAIL  celebration shown again' : 'ok    Badges: celebration does not fire twice');
+  await expectVisible(page, page.getByRole('button', { name: /^Badges: 2 of 10 earned/ }), 'Badges: Progress entry card says 2 of 10');
+  await page.getByRole('button', { name: /^Badges: 2 of 10 earned/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Badges' }), 'Badges: grid screen opens');
+  await expectVisible(page, page.getByLabel(/^First Journey\. Earned .*\d{4}\./), 'Badges: First Journey earned with its date');
+  await expectVisible(page, page.getByLabel(/^Cavite Explorer\. Earned /), 'Badges: Cavite Explorer earned');
+  await expectVisible(page, page.getByLabel(/^Laguna Explorer\. Locked, 0 of 6\./), 'Badges: Laguna Explorer locked, 0 of 6');
+  const tileCount = await page.getByLabel(/\. (Earned|Locked)/).count();
+  results.push(tileCount >= 10 ? `ok    Badges: all 10 tiles rendered (${tileCount} labels)` : `FAIL  badge tiles: ${tileCount}`);
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-badges');
+
+  // R6-4. Certificate (from the Cavite badge), editable name, share, dark parchment
+  await page.getByRole('button', { name: /View certificate/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Cavite Heritage Explorer'), 'Certificate: Cavite Heritage Explorer');
+  await expectVisible(page, text(page, 'This certifies that'), 'Certificate: heritage wording');
+  await expectVisible(page, text(page, EMAIL.split('@')[0]), 'Certificate: holder defaults to the email prefix');
+  await expectVisible(page, text(page, 'all 5 destinations of Cavite'), 'Certificate: covers all 5 Cavite destinations');
+  await page.locator('input:visible').last().fill('Juana Dela Cruz');
+  await expectVisible(page, text(page, 'Juana Dela Cruz'), 'Certificate: typed name appears on the certificate');
+  const certName = await page.evaluate(() => localStorage.getItem('vtour.certificateName'));
+  results.push(certName === 'Juana Dela Cruz' ? 'ok    Certificate: name saved on the device' : `FAIL  certificate name stored: ${certName}`);
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-certificate');
+  await page.getByRole('button', { name: /Share as image/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(500);
+  const certShare = await page.evaluate(() => window.__shared.at(-1) ?? null);
+  results.push(/Cavite Heritage Explorer/.test(JSON.stringify(certShare)) ? 'ok    Certificate: share hands off (web: text; phone: image)' : `FAIL  certificate share: ${JSON.stringify(certShare)}`);
+  const sampleCertificate = async () => {
+    const box = await page.getByLabel(/^Certificate of completion for /).filter({ visible: true }).first().boundingBox();
+    const image = await page.screenshot({ clip: { x: box.x + box.width / 2 - 3, y: box.y + 20, width: 6, height: 6 } });
+    const { data } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    return { r: data[0], g: data[1], b: data[2] };
+  };
+  const lightParchment = await sampleCertificate();
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await page.waitForTimeout(300);
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await openSettings();
+  await page.getByRole('radio', { name: 'Dark' }).click();
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await goTab(/Progress/);
+  await page.getByRole('button', { name: /View certificate/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Cavite Heritage Explorer'), 'Certificate: opens from the Progress province row');
+  await page.waitForTimeout(800);
+  const darkParchment = await sampleCertificate();
+  const cream = (c) => c.r > 225 && c.g > 215 && c.b > 190 && c.r >= c.b;
+  results.push(
+    cream(lightParchment) && cream(darkParchment)
+      ? `ok    Certificate: cream parchment in light and dark (rgb ${darkParchment.r},${darkParchment.g},${darkParchment.b})`
+      : `FAIL  parchment light ${JSON.stringify(lightParchment)} dark ${JSON.stringify(darkParchment)}`,
+  );
+  await shot(page, 'r6-certificate-dark');
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await openSettings();
+  await page.getByRole('radio', { name: 'Light' }).click();
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+
+  // R6-5. Heritage Insights (Progress header icon and the Home card)
+  await goTab(/Progress/);
+  await clickActionable(page.getByLabel('Open community insights').filter({ visible: true }));
+  await expectVisible(page, page.getByRole('heading', { name: 'Heritage Insights' }), 'Insights: opens from the Progress header');
+  for (const section of ['Most visited', 'Top rated', 'Toughest quizzes', 'Visits by province', 'Visits by category']) {
+    await expectVisible(page, page.getByRole('heading', { name: section }), `Insights: ${section} section`);
+  }
+  await expectVisible(page, page.getByLabel(/^Number 1: Aguinaldo Shrine, 2 visits$/), 'Insights: most visited ranks Aguinaldo Shrine first (2 visits)');
+  await expectVisible(page, page.getByLabel(/^Number 1: Aguinaldo Shrine, 5\.0 out of 5 from 1 ratings$/), 'Insights: top rated shows the 5.0 rating');
+  await expectVisible(page, page.getByLabel(/^Cavite: 6 visits$/), 'Insights: visits by province (Cavite 6)');
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-insights');
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await goTab(/Home/);
+  await expectVisible(page, page.getByRole('button', { name: /^Community insights\./ }), 'Insights: Home card');
+  await page.getByRole('button', { name: /^Community insights\./ }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Heritage Insights' }), 'Insights: Home card opens the screen');
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+  await expectVisible(page, page.getByRole('button', { name: /^Plan a field trip\./ }), 'Planner: Home card');
+
+  // R6-6. Field trip planner: select → suggested order → reorder → Google Maps URL → save / delete
+  await goTab(/Map/);
+  await page.getByRole('button', { name: 'Plan a field trip', exact: true }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Plan a field trip' }), 'Planner: opens from the Map header');
+  await expectVisible(page, text(page, '0 of 8 stops'), 'Planner: counter starts at 0 of 8');
+  await expectVisible(page, text(page, 'Google Maps takes up to 8 stops'), 'Planner: counter explains the 8-stop limit');
+  await expectVisible(page, text(page, 'Start from my location'), 'Planner: "Start from my location" offered when location is allowed');
+  for (const name of ['Lucban Heritage Town', 'Aguinaldo Shrine', 'Rizal Shrine', 'Pila Heritage Town']) {
+    await page.getByRole('checkbox', { name: new RegExp(`^${name}`) }).filter({ visible: true }).first().click();
+  }
+  await expectVisible(page, text(page, '4 of 8 stops'), 'Planner: selecting 4 stops updates the counter');
+  await page.getByPlaceholder('Search destinations', { exact: true }).fill('Taal');
+  await page.waitForTimeout(300);
+  const filtered = await page.getByRole('checkbox').filter({ visible: true }).count();
+  results.push(filtered >= 1 && filtered <= 3 ? `ok    Planner: search narrows the list (${filtered} for "Taal")` : `FAIL  planner search: ${filtered}`);
+  await page.getByPlaceholder('Search destinations', { exact: true }).fill('');
+  await page.waitForTimeout(800);
+  await shot(page, 'r6-planner-select');
+  await page.getByRole('button', { name: /Plan the route \(4 stops\)/ }).click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Suggested order' }), 'Planner: "Suggested order" (nearest neighbour)');
+  const stopOrder = async () =>
+    page.getByLabel(/^Stop \d: /).filter({ visible: true }).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label').replace(/^Stop \d: /, '')));
+  const suggested = await stopOrder();
+  results.push(
+    JSON.stringify(suggested) === JSON.stringify(['Lucban Heritage Town & Pahiyas Festival', 'Pila Heritage Town', 'Rizal Shrine', 'Aguinaldo Shrine'])
+      ? 'ok    Planner: nearest-neighbour order from Lucban → Pila → Rizal Shrine → Aguinaldo'
+      : `FAIL  suggested order: ${suggested.join(' → ')}`,
+  );
+  await expectVisible(page, text(page, /^Total ≈ \d+(\.\d)? km$/, false), 'Planner: total straight-line distance');
+  await expectVisible(page, text(page, 'Straight-line distance — approximate'), 'Planner: distance labelled approximate');
+  await expectVisible(page, text(page, /^About .+ of driving$/, false), 'Planner: rough time estimate');
+  await expectVisible(page, page.getByLabel('Route map with 4 numbered stops'), 'Planner: route map with numbered stops');
+  await page.waitForTimeout(900);
+  await shot(page, 'r6-planner-plan');
+  await page.getByLabel('Move Pila Heritage Town down').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Your order' }), 'Planner: manual reorder switches to "Your order"');
+  const reordered = await stopOrder();
+  results.push(reordered[1] === 'Rizal Shrine' && reordered[2] === 'Pila Heritage Town' ? 'ok    Planner: Move down swaps the stops' : `FAIL  reordered: ${reordered.join(' → ')}`);
+  await page.getByRole('button', { name: /Open in Google Maps/ }).click();
+  await page.waitForTimeout(300);
+  const route = await lastOpened();
+  results.push(
+    route ===
+      'https://www.google.com/maps/dir/?api=1&origin=14.11485%2C121.55369&destination=14.445%2C120.9069&waypoints=14.21368%2C121.16683%7C14.23378%2C121.36444&travelmode=driving'
+      ? 'ok    Planner: Google Maps dir URL with origin, encoded waypoints (in the new order) and destination'
+      : `FAIL  planner URL: ${route}`,
+  );
+  await page.getByRole('button', { name: /Save plan/ }).click();
+  await page.waitForTimeout(800);
+  await page.locator('input:visible').last().fill('UI check trip');
+  await clickActionable(page.getByRole('button', { name: /^Save$/ }).filter({ visible: true }));
+  await expectVisible(page, text(page, 'Plan saved on this phone'), 'Planner: plan saved');
+  const storedPlans = await page.evaluate(() => localStorage.getItem('vtour.tripPlans'));
+  results.push(/UI check trip/.test(storedPlans ?? '') ? 'ok    Planner: saved in AsyncStorage (vtour.tripPlans)' : `FAIL  stored plans: ${storedPlans}`);
+  await page.getByRole('button', { name: /Edit stops/ }).click();
+  await expectVisible(page, page.getByRole('button', { name: /^Open the plan UI check trip, 4 stops$/ }), 'Planner: saved plan listed');
+  await page.getByLabel('Delete the plan UI check trip').click();
+  await page.waitForTimeout(800);
+  await clickActionable(page.getByRole('button', { name: /^Delete$/ }).filter({ visible: true }));
+  await page.waitForTimeout(600);
+  const planGone = !(await page.getByRole('button', { name: /^Open the plan UI check trip/ }).isVisible().catch(() => false));
+  results.push(planGone ? 'ok    Planner: saved plan deleted' : 'FAIL  plan still listed after delete');
+  await clickActionable(page.getByLabel('Go back').filter({ visible: true }));
+
+  // R6-7. Auto-generated starter quiz for a destination added in the app (then deleted)
+  await goTab(/Explore/);
+  await page.getByLabel('Add a destination').click();
+  await expectVisible(page, text(page, 'Add a Destination'), 'Auto quiz: Add form opens');
+  const formInputs = page.locator('input:visible');
+  await formInputs.nth(0).fill(AUTO_NAME);
+  await page.locator('textarea:visible').first().fill(
+    'A restored estate house where revolutionary leaders gathered in 1897. The convention held here elected new officers and changed the course of the uprising in the province.',
+  );
+  await page.getByRole('button', { name: /^Category: / }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(800);
+  await page.getByRole('radio', { name: 'Historical Site', exact: true }).filter({ visible: true }).last().click();
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: /^Province: / }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(800);
+  await page.getByRole('radio', { name: 'Cavite', exact: true }).filter({ visible: true }).last().click();
+  await page.waitForTimeout(300);
+  const textInputs = page.locator('input:visible:not([readonly])');
+  await textInputs.nth(1).fill('Rosario');
+  await textInputs.nth(2).fill('Tejeros, Rosario, Cavite');
+  await page.getByRole('button', { name: /Add destination$/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: AUTO_NAME }), 'Auto quiz: new destination saved and opened');
+  await page.waitForTimeout(1500);
+  const autoRows = await db.query(
+    `select q.source, (select count(*) from public.quiz_options o where o.question_id = q.id and o.is_correct)::int correct
+       from public.quiz_questions q join public.destinations d on d.id = q.destination_id where d.name = $1`,
+    [AUTO_NAME],
+  );
+  results.push(
+    autoRows.rows.length === 5 && autoRows.rows.every((row) => row.source === 'auto' && row.correct === 1)
+      ? 'ok    Auto quiz: 5 auto questions (one correct option each) written on create'
+      : `FAIL  auto quiz rows: ${JSON.stringify(autoRows.rows)}`,
+  );
+  await page.getByRole('button', { name: /^Quiz$/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByLabel('Auto-generated starter quiz, built from the details entered for this place'), 'Auto quiz: intro shows the "Auto-generated starter quiz" badge');
+  await expectVisible(page, text(page, 'Every answer comes from the details entered for this place'), 'Auto quiz: evidence line adapted');
+  await page.waitForTimeout(600);
+  await shot(page, 'r6-auto-quiz');
+  await text(page, 'Start the quiz').click();
+  await expectVisible(page, text(page, 'Question 1 of 5'), 'Auto quiz: plays in the normal quiz engine');
+  await expectVisible(page, text(page, `In which province is ${AUTO_NAME}?`), 'Auto quiz: first question asks for the province');
+  await page.getByLabel('Close the quiz').click();
+  await page.waitForTimeout(400);
+  if (await text(page, 'Leave the quiz?').isVisible().catch(() => false)) await text(page, 'Leave').click();
+  await page.getByRole('button', { name: /Delete$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(800);
+  await clickActionable(page.getByRole('button', { name: /^Delete$/ }).filter({ visible: true }));
+  await page.waitForTimeout(1500);
+  const leftAuto = await db.query(
+    `select (select count(*) from public.destinations where name = $1)::int d,
+            (select count(*) from public.quiz_questions where source = 'auto')::int q`,
+    [AUTO_NAME],
+  );
+  results.push(leftAuto.rows[0].d === 0 && leftAuto.rows[0].q === 0 ? 'ok    Auto quiz: test destination deleted, its quiz cascaded away' : `FAIL  leftovers: ${JSON.stringify(leftAuto.rows[0])}`);
 
   // 15. A second, fresh browser: Skip, "Not now", and a refused permission
   const fresh = await browser.newContext({ viewport: { width: 412, height: 915 } });
@@ -666,15 +958,20 @@ try {
     await db.query('delete from public.quiz_attempts where device_id = $1', [key]);
     await db.query('delete from public.destination_completions where device_id = $1', [key]);
     await db.query('delete from public.favorites where device_id = $1', [key]);
+    await db.query('delete from public.ratings where device_id = $1', [key]);
   }
+  // Run 6: the destination added through the form (its quiz cascades with it).
+  await db.query("delete from public.destinations where name like 'UI check Casa Tejeros%'");
   if (testUserId) await db.query('delete from auth.users where id = $1', [testUserId]);
   // Never leave an account behind, even if a sign-up unexpectedly succeeded.
   await db.query("delete from auth.users where email = $1 or email = 'someone@example.com'", [EMAIL]);
   const left = await db.query(
     `select (select count(*) from public.quiz_attempts)::int a, (select count(*) from public.destination_completions)::int c,
-            (select count(*) from public.favorites)::int f, (select count(*) from auth.users)::int u`,
+            (select count(*) from public.favorites)::int f, (select count(*) from auth.users)::int u,
+            (select count(*) from public.ratings)::int r, (select count(*) from public.destinations)::int d,
+            (select count(*) from public.quiz_questions)::int q`,
   );
-  results.push(`info  after clean-up: attempts ${left.rows[0].a}, completions ${left.rows[0].c}, favorites ${left.rows[0].f}, auth users ${left.rows[0].u}`);
+  results.push(`info  after clean-up: attempts ${left.rows[0].a}, completions ${left.rows[0].c}, favorites ${left.rows[0].f}, ratings ${left.rows[0].r}, auth users ${left.rows[0].u}, destinations ${left.rows[0].d}, questions ${left.rows[0].q}`);
   await db.end();
   await browser.close();
   server.close();

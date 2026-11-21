@@ -90,8 +90,7 @@ export default function BadgesScreen() {
             <>
               <View style={styles.summary}>
                 <AppIcon name="medal-outline" size="md" color="secondaryDark" />
-                <AppText variant="subtitle">{t('achievements.summary', { count: earnedCount(data.badges) })}</AppText>
-                <AppText variant="label" color="inkSoft">
+                <AppText variant="subtitle">
                   {t('achievements.entrySubtitle', { earned: earnedCount(data.badges), total: data.badges.length })}
                 </AppText>
               </View>

@@ -159,6 +159,116 @@ Screens:
    fontScale ≥ 1.15, Progress nudge wraps, segmented options stack icon over
    label).
 
+### Run 6 — feature modules (built)
+
+Every module is themed (tokens only, light + dark), localized (en + fil),
+accessible (labels / roles, ≥ 44 dp, no colour-only meaning) and degrades
+offline like the catalogue. **The required (professor-spec) flows did not
+change**: the 134 earlier click-through checks still pass unchanged.
+
+1. **360° view** — "View in 360°" opens Google Street View with the no-key
+   URL `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=<lat>,<lng>`
+   (`streetViewUrl()` in `src/lib/outbound.ts`, `openStreetView()` in
+   `device.ts`, light haptic). On Details (next to Get directions) and as a
+   card on the tour's **Gallery step** — not a step of its own, so the tour's
+   step sequence (Intro → Gallery → History → Culture → Complete) and every
+   flow built on it are unchanged. Hidden offline and without coordinates.
+   Shipped for all 26 destinations: the build-time coverage check
+   (Street View metadata endpoint with the Maps key) returned
+   `REQUEST_DENIED` — "This API is not activated on your API project" — so
+   no per-destination curation; Google shows the map where there is no
+   panorama.
+2. **Auto-generated starter quiz** for destinations added in the app —
+   `src/lib/quizGenerator.ts` (pure, seeded: FNV-1a hash of the destination
+   id → mulberry32). Five slots, each the first generator that can build a
+   sound question and is unused: province (all 5 provinces as options) ·
+   town (3 other catalogue towns) · category (3 of the other 4) · "Which
+   destination is described here?" (lead sentence, name masked; other
+   catalogue names) · fill-in-the-blank from the description (≥ 14 words;
+   other long words of the same description). Fallbacks: "Which of these is
+   a <category> in <province>?" (only when no other entry shares both),
+   a category + province statement, the region (IV-A), true / false.
+   Correct answers always come from the user's own fields. `syncAutoQuiz()`
+   (`src/lib/autoQuiz.ts`, repo injected) runs after every save in
+   `DestinationForm`: create → generate; edit of name / description /
+   municipality / province / category → delete the `source='auto'` rows and
+   re-insert; other edits leave it (but backfill a quiz-less entry). A
+   destination with any curated question is **never** touched
+   (`quizRepository.replaceAutoQuiz` → `'skipped-curated'`). Best-effort: a
+   quiz failure never undoes the save. The quiz intro shows an
+   "Auto-generated starter quiz" badge and an adapted evidence line.
+3. **Achievements & badges** — `src/lib/achievements.ts`, derived from
+   visits, attempts and favorites only (no table). Registry `BADGES` (display
+   order): First Journey (1 visit) · Cavite / Laguna / Batangas / Rizal /
+   Quezon Explorer (every catalogue destination of the province) · Heritage
+   Scholar (perfect score on 5 **different** destinations — retakes of one
+   place count once) · Quiz Enthusiast (15 attempts) · Collector (8
+   favorites) · CALABARZON Master (every destination in the catalogue).
+   Thresholds in `BADGE_THRESHOLDS`. The earned date is the time of the row
+   that made the rule hold (nth row in time order; for sets, the latest
+   visit of the set). `/badges` (from a card on Progress): 2-column grid,
+   earned = full colour + "Earned <date>", locked = dashed outline + lock +
+   "Locked · n of m" + meter. Celebration: `AchievementsContext`
+   (`checkAchievements()` after a saved quiz, after Mark as Visited, and when
+   Progress is focused and loaded) shows a **non-blocking banner** below the
+   top bar (success haptic, auto-dismiss 4.5 s, View → /badges) — a banner,
+   not a modal, so it can never block the flow underneath. "Seen" ids per
+   user key in AsyncStorage (`vtour.badgesSeen.<userKey>`), so each fires
+   once.
+4. **Star ratings** — table `ratings` (below), `ratingsRepository`
+   (`rate` = upsert on (destination, key), `getMine`, `listForDestination`,
+   `listAll` (destination + stars only), `listMine`). Maths in
+   `src/lib/ratings.ts` (average to one decimal, half-up). Details:
+   `<RatingCard>` — five 48 dp star radios (filled vs outline + spelled-out
+   label), own rating editable, average + count; a save calls
+   `notifyChanged()` so cards and Insights refresh. Explore cards:
+   `<RatingInline>` "★ 4.6 (12)" when ratings exist. Offline: the input
+   hides, the cached average shows with a note (reads go through the offline
+   cache). Included in the guest → account transfer (the account's own
+   rating wins on a clash).
+5. **Heritage Insights** — `/insights`, from a Progress header icon
+   (chart) and a Home card. `computeInsights()` (`src/lib/insights.ts`) over
+   every visit / attempt / rating (`progressRepository.listAllCompletions`,
+   `listAllAttempts`, `ratingsRepository.listAll` — no user keys): totals,
+   Most visited (top 5), Top rated (top 5, ≥ 1 rating), Toughest quizzes
+   (lowest average %, ≥ 1 attempt), visits by province and by category —
+   drawn with `Meter` rows, no chart library. Empty states; pull to refresh;
+   saved for offline.
+6. **Certificate of Completion** — `/certificate?scope=<Province|region>`.
+   `qualifyingCertificates()` (`src/lib/certificate.ts`): a province when all
+   its destinations are visited, the region ("CALABARZON Heritage
+   Explorer") when all are. "View certificate" on the earned province row
+   and on the overview (all visited) in Progress, and on the matching
+   badges. Design: parchment band + gold frame, laurel sprigs (rotated
+   `leaf` icons) around a compass medallion, Playfair name, gold rule, date,
+   app line — using the `parchment*` design constants, so it stays cream in
+   both themes. Holder: the name typed on the screen
+   (`vtour.certificateName`), else the email prefix, else "Guest Explorer".
+   Share: `src/lib/certificateShare.ts` captures with
+   **react-native-view-shot** (`captureRef`, PNG) → iOS shares the image;
+   **Android shares a text message** (React Native's `Share` carries text
+   only on Android, and this run allowed no other native module —
+   installing expo-sharing was refused). Web: `certificateShare.web.ts`
+   (text only; view-shot's web capture needs `html2canvas-pro`, which would
+   break the web export).
+7. **Field Trip Planner** — `/planner`, from a Map header button
+   (`map-marker-path`) and a Home card. Select: searchable checklist
+   (`role=checkbox`, selection order numbered), counter "n of 8 stops ·
+   Google Maps takes up to 8 stops", optional "Start from my location"
+   (shown while location is granted or not yet asked; asking happens on the
+   toggle). Plan: **Suggested order** = nearest-neighbour from the location
+   (or the first selected stop), ties keep selection order; up / down /
+   remove per stop → "Your order" (+ "Use the suggested order"). Per-leg and
+   total straight-line km ("approximate"); time estimate = km × 1.35 (road
+   factor) ÷ 35 km/h, rounded to 5 min ("a rough estimate"). Route on an
+   embedded map: `TripMap.tsx` (native Polyline + numbered `TripPin`s,
+   markers freeze after 400 ms) / `TripMap.web.tsx` (schematic). Hand-off:
+   `buildDirectionsUrl()` → `https://www.google.com/maps/dir/?api=1&origin=…&destination=…&waypoints=a%7Cb&travelmode=driving`
+   (origin = location or first stop; capped at `MAX_STOPS` = 8; hidden
+   behind a note offline). Plans: save / load / delete on the phone only
+   (`vtour.tripPlans`, `src/lib/tripPlans.ts` with an injected store,
+   bound in `appTripPlans.ts`; max 30 plans).
+
 ### Identity model ("user key")
 
 No schema change: the text column `device_id` on `quiz_attempts` and
@@ -187,7 +297,8 @@ choice is remembered, so guests are not shown Welcome on every launch.
   offline cache), **react-native-maps** (Map tab), **react-native-svg**
   (progress ring), **expo-crypto** (device UUID), **react-native-reanimated**
   (step transitions), **expo-location** (Near me), **expo-haptics**,
-  **expo-speech** (narration) — all included in Expo Go.
+  **expo-speech** (narration), **react-native-view-shot** (Run 6, the
+  certificate image) — all included in Expo Go.
 - **react-native-paper** (Material Design 3) with the custom theme below.
 - **@supabase/supabase-js** for all data.
 - **expo-image** for all image rendering; **expo-image-picker** +
@@ -241,6 +352,9 @@ Semantic tokens to know:
   `glass`, `onPhoto*`, `photoShade*` — the tour's dark "gallery wall" stays
   itself in light and dark.
 - Home hero: `heroBackground`, `heroWatermark`, `heroAccent`.
+- Certificate (Run 6): `parchment`, `parchmentDeep`, `onParchment`,
+  `onParchmentSoft`, `parchmentGold` — design constants (same in both
+  themes, a printed document), contrast-audited in `contrastPairs.ts`.
 - Map pins: `category*` (distinct hues), `pinRim` (white on the light map,
   deep brown on the dark map).
 
@@ -260,7 +374,7 @@ Semantic tokens to know:
 
 ### Languages (Run 5)
 
-- `src/i18n/en.ts` is the source of truth (490 keys); `src/i18n/fil.ts` has
+- `src/i18n/en.ts` is the source of truth (666 keys since Run 6; 490 in Run 5); `src/i18n/fil.ts` has
   the same shape (`DictionaryShape<…>`, so a missing key is a type error).
   Filipino = everyday Taglish UI Filipino ("I-save", "Mga Paborito",
   "Tuklasin"); proper nouns stay.
@@ -296,6 +410,17 @@ Two files together define everything in the database:
 | `quiz_attempts` | `destination_id` → cascade, `device_id` (the user key), `score`, `total`, `taken_at`. One row per finished attempt. |
 | `destination_completions` | `destination_id` → cascade, `device_id` (the user key), `completed_at`, unique `(destination_id, device_id)` — so "Mark as Visited" is idempotent per user. |
 | `favorites` (Run 4) | `destination_id` → cascade, `device_id` (the user key), `created_at`, unique `(destination_id, device_id)`. Same permissive anon + authenticated policies. Added to the live DB by `supabase/migrations/20261118_favorites.sql` — no reset. |
+| `ratings` (Run 6) | `destination_id` → cascade, `device_id` (the user key), `stars` (CHECK 1–5), `created_at`, `updated_at` (trigger), unique `(destination_id, device_id)`. Same permissive policies. Added live by `supabase/migrations/20261122_ratings.sql`. |
+
+`quiz_questions.source` (Run 6): `text not null default 'curated'`, CHECK
+`'curated' | 'auto'`, added live by `supabase/migrations/20261121_quiz_source.sql`
+(every existing row became 'curated'). Seeding never sets it, so the dataset
+is always curated.
+
+Run 6 migration run (2026-11-21, `npm run db:migrate`, twice — idempotent):
+before = after = 26 destinations, 78 photos, 130 questions, 520 options,
+0 attempts, 0 visits, 0 favorites; `ratings` created empty. `db-migrate.js`
+now guards all of these counts (tables a migration creates may appear).
 
 - **Categories**: Historical Site · Church & Religious · Museum & Art ·
   Natural Wonder · Heritage Town & Culture.
@@ -426,16 +551,16 @@ the direct host is IPv6-only and does not.
 | Command | What it does |
 | --- | --- |
 | `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
-| `npm run db:migrate` | Runs every file in `supabase/migrations/` (idempotent, one transaction each) against the live DB, and fails if existing destination / attempt / visit counts change. Use this — not `db:setup` — for additive schema changes. |
+| `npm run db:migrate` | Runs every file in `supabase/migrations/` (idempotent, one transaction each) against the live DB, and fails if existing destination / photo / question / option / attempt / visit / favorite / rating counts change. Use this — not `db:setup` — for additive schema changes. |
 | `npm run db:sync-photos` | **Non-destructive photo top-up**: uploads the processed photos and updates only `cover_image_url` and the `destination_images` URLs / captions by stable id. Use it after replacing photos so live progress and favorites survive (unlike `db:seed`). |
 | `npm run i18n:check` | `scripts/i18n-check.ts`: en/fil dictionaries match (keys, placeholders, plurals, no empty text) and no hard-coded UI text in `src/app` / `src/components`. Run 5: 490 keys, clean. |
 | `npm run secrets:check` | Secret scan before any push: `.env` ignored and never committed; DB password (raw / URL-encoded), `sb_secret`, credentialed connection strings and Google keys absent from every tracked file and every commit. Prints counts only. |
 | `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
-| `npm run db:verify` | Read-only check: 6 tables with RLS, exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
-| `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Cleans up after itself. |
+| `npm run db:verify` | Read-only check: 8 tables with RLS (incl. `ratings`), exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
+| `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Run 6 adds 11 live checks (50 in all): every dataset question curated; create → 5-question starter quiz; regeneration on a quiz-field edit (old rows and options gone), none on an address edit; curated untouched; cascade; ratings upsert, unique + 1–5 check, per-key isolation, average, transfer dedupe; insights / badges / certificates from live rows. Cleans up after itself. |
 | `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
 | `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
-| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134 (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134; **Run 6: 205/205** (the 134 earlier checks first, unchanged, then 71 for 360°, ratings, badges + celebration, certificate in light and dark, insights, the planner and an auto-quiz destination added through the form and deleted again) (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
 | `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
 | `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
@@ -468,11 +593,13 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
 - **Repository pattern.** Screens and components never call supabase-js.
   - `src/lib/supabase.ts` — the one client.
   - `src/repositories/destinations.ts`, `destinationImages.ts`, `quiz.ts`,
-    `progress.ts`, `favorites.ts`, `auth.ts` — factories that take a client, so Node scripts
+    `progress.ts`, `favorites.ts`, `ratings.ts`, `auth.ts` — factories that take a client, so Node scripts
     can reuse them. Keep them (and `src/lib/destinationForm.ts`, `featured.ts`,
     `base64.ts`, `errors.ts`, `quiz.ts`, `progress.ts`, `authForm.ts`,
     `mapRegion.ts`, `format.ts`, `geo.ts`, `favorites.ts`, `offlineCache.ts`,
-    `outbound.ts`, `src/constants/taxonomy.ts`) free of React Native imports — the unit tests and live scripts load them in Node.
+    `outbound.ts`, Run 6's `quizGenerator.ts`, `autoQuiz.ts`, `achievements.ts`,
+    `ratings.ts`, `insights.ts`, `certificate.ts`, `planner.ts`, `tripPlans.ts`,
+    `src/constants/taxonomy.ts`) free of React Native imports — the unit tests and live scripts load them in Node.
   - **Progress is always keyed by `useIdentity().userKey`**; never read or
     write progress rows with any other id.
   - `src/repositories/index.ts` — binds the factories to the app client.
@@ -506,7 +633,8 @@ A misdiagnosed block cost hours in Run 2. What is actually true (built into `scr
 - **State** — `ExploreFiltersContext` (search + filters, shared by Home and
   Explore), `DataSyncContext`, `ToastContext`, `IdentityContext` (session,
   user key, auth actions, onboarding flag), `LocationContext` (Near me),
-  `FavoritesContext` (hearts). Nothing heavier. A favorite toggle reloads the
+  `FavoritesContext` (hearts), `AchievementsContext` (Run 6: badge
+  celebrations). Nothing heavier. A favorite toggle reloads the
   favorites query only (not `notifyChanged()`), since every heart reads the
   same context.
 - **Imports** use the `@/` alias for `src/`.
@@ -517,18 +645,23 @@ Folder layout:
 src/
   app/                 Expo Router routes only
     _layout.tsx        Fonts, providers, root stack (Protected groups)
-    welcome, sign-in, sign-up, add
+    welcome, sign-in, sign-up, add, settings, credits
+    badges, insights, certificate, planner   (Run 6)
     (tabs)/            _layout (tab bar), index (Home), explore, map, progress
     destination/[id]/  index (Details), edit, tour, quiz
   components/          Shared UI; form/ (the form), auth/ (auth fields),
-                       map/ (native + .web map, preview, legend)
+                       map/ (native + .web map, preview, legend, TripMap + TripPin)
+                       RatingCard, StarRating (Run 6)
   constants/           taxonomy.ts
-  context/             DataSync, ExploreFilters, Toast, Identity, Location, Favorites
-  hooks/               useAsyncData, useDestinations, useProgress, useDebouncedValue
+  context/             DataSync, ExploreFilters, Toast, Identity, Location, Favorites, Achievements
+  hooks/               useAsyncData, useDestinations, useProgress, useDebouncedValue,
+                       useRatings, useInsights, useAchievements (Run 6)
   lib/                 supabase, errors, destinationForm, featured, coverPhoto, base64,
                        format, quiz, progress, authForm, mapRegion, localPrefs,
-                       geo, favorites, offlineCache + appCache, outbound, device
-  repositories/        Data access (destinations, destinationImages, quiz, progress, favorites, auth)
+                       geo, favorites, offlineCache + appCache, outbound, device,
+                       Run 6: quizGenerator, autoQuiz, achievements, ratings, insights,
+                       certificate + certificateShare(.web), planner, tripPlans + appTripPlans
+  repositories/        Data access (destinations, destinationImages, quiz, progress, favorites, ratings, auth)
   theme/               Design tokens + Paper, navigation and Google Maps themes
   types/               database.ts
 tests/                 Unit tests (npm test)
@@ -653,6 +786,24 @@ assets/                Icons, splash emblem (sources in assets/brand)
   the Expo GraphQL API (`androidAppBuildCredentialsList → androidKeystore →
   sha1CertificateFingerprint`); the APK is v2-signed only, so JRE 8's
   `keytool -printcert -jarfile` cannot read it.
+- **react-native-view-shot on web** imports `html2canvas-pro` (an optional
+  peer we do not ship), and Metro fails the web export on it. Keep every
+  view-shot import in a native-only file with a `.web.ts` twin
+  (`certificateShare.ts` / `.web.ts`).
+- **React Native `Share` on Android carries text only** (`message`); `url`
+  is iOS-only. Sharing an image file on Android needs a module such as
+  expo-sharing (in Expo Go) — not added in Run 6 (the run allowed only
+  view-shot; the install was refused), so Android shares text.
+- **Street View metadata** (`maps.googleapis.com/maps/api/streetview/metadata`)
+  answers `REQUEST_DENIED` with our Maps key (API not enabled in its Google
+  Cloud project). The pano URL needs no key, so the feature does not depend
+  on it.
+- Web click-through: Paper dialogs fade in — wait ~800 ms before clicking
+  inside one; and wait for a pushed screen's heading before typing into
+  `input:visible` (a hidden tab's search box can match during the
+  transition — Run 6 added that wait before the Sign In fill).
+- Celebrations must not be modals: anything that covers the screen breaks
+  flows (and the click-through) that continue underneath. Use the banner.
 - `sharp` is a devDependency used only by the Node scripts. Never import it
   (or anything under `scripts/`) from `src/`.
 
@@ -730,13 +881,36 @@ Run 5 (platform pass)
 - [x] Audio narration in the tour (expo-speech)
 - [x] Owner: "Confirm email" turned OFF (auth:test reports it OFF on 2026-11-21)
 
-Next (Run 6)
+Run 6 (feature modules)
 
-- [ ] Device pass for Run 5 (both themes, Filipino, narration audio, native pins)
+- [x] 360° Street View link (Details + tour Gallery card); metadata curation skipped (API not enabled)
+- [x] Auto-generated starter quiz for user-added destinations (`quiz_questions.source` migration)
+- [x] 10 badges derived from existing rows, Badges screen, once-only celebration banner
+- [x] Star ratings (`ratings` migration), Details input, Explore ★ average, guest transfer
+- [x] Heritage Insights (Progress icon + Home card)
+- [x] Certificates of completion (province / region), view-shot capture, share
+- [x] Field Trip Planner (nearest-neighbour order, reorder, route map, Google Maps hand-off, saved plans)
+- [x] QA: 138 unit, 50 db:test, 6 auth:test, 205 web click-through, i18n 666 keys, tsc, lint, expo-doctor 20/20, Android Hermes export
+
+Next (Run 7)
+
+- [ ] Final QA + device pass for Runs 5–6 (both themes, Filipino, narration, native pins, Run 6 list below)
+- [ ] APK v1.1.0 (bump `version` + `android.versionCode`), GitHub Release
 - [ ] Documentation, wireframes, web demo deploy
-- [ ] New APK (1.0.2) with the Run 5 features
+- [ ] Decide on image sharing for Android certificates (expo-sharing, Expo Go-supported) — needs the architect's OK
+- [ ] Owner (optional): enable the Street View Static API on the Maps key's project if per-destination 360° curation is wanted
 
 ## Not yet verified on a device
+
+**Run 6 is web- and test-verified only.** Phone-only parts: the Street View
+hand-off (Google Maps app opening the pano; what Google shows where there is
+no panorama), the certificate capture with react-native-view-shot and the
+share sheet (image on iOS, text on Android), the planner's native map
+(Polyline, numbered marker bitmaps freezing, camera framing), the Google
+Maps directions hand-off with waypoints in the app, "Start from my
+location" with real GPS and the system permission dialog, the success
+haptic of the badge banner, star taps and their haptic, and the new screens
+at 1.3× font scale on a 360 dp phone.
 
 The owner verified Runs 1–4 on physical devices (v1.0.1 APK on Android,
 Expo Go on iOS). **Run 5 is web- and test-verified only**: both themes on
