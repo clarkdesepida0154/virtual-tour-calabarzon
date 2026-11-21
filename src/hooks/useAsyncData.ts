@@ -73,7 +73,7 @@ export function useAsyncData<T>(
           key,
           revision,
           data: previous?.key === key ? previous.data : undefined,
-          error: toAppError(cause, 'We couldn’t load this.'),
+          error: toAppError(cause, 'generic'),
         }));
         setIsRefreshing(false);
       },

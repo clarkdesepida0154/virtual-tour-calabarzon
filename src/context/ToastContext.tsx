@@ -1,10 +1,11 @@
 import { createContext, use, useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
 import { Snackbar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, layout, motion, radius, spacing } from '@/theme';
+import { layout, motion, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type ToastValue = {
   /** Shows a brief confirmation at the bottom of the screen. */
@@ -15,6 +16,8 @@ const ToastContext = createContext<ToastValue | null>(null);
 
 /** App-wide snackbar, so a message survives the navigation that follows it. */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   // A new object per call, so repeating the same message shows it again.
   const [toast, setToast] = useState<{ message: string } | null>(null);
@@ -29,7 +32,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         visible={toast !== null}
         onDismiss={() => setToast(null)}
         duration={motion.toast}
-        action={{ label: 'OK', onPress: () => setToast(null) }}
+        action={{ label: t('common.ok'), onPress: () => setToast(null) }}
         wrapperStyle={[styles.wrapper, { bottom: insets.bottom + layout.snackbarOffset }]}
         style={styles.snackbar}>
         {toast?.message ?? ''}
@@ -44,7 +47,7 @@ export function useToast(): ToastValue {
   return value;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   wrapper: {
     paddingHorizontal: spacing.sm,
   },
@@ -52,4 +55,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     borderRadius: radius.md,
   },
-});
+}));

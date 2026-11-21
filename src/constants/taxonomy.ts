@@ -24,12 +24,14 @@ export type Category = (typeof CATEGORIES)[number];
 export const REGION_NAME = 'CALABARZON';
 export const REGION_LABEL = 'Region IV-A · CALABARZON';
 
+/**
+ * Icon and colour of each category. Its labels ("Historical", the Home tile
+ * blurb) live in the i18n dictionaries (`categories.<key>`), so they follow
+ * the UI language; the category values themselves stay English in the
+ * database.
+ */
 type CategoryMeta = {
   icon: IconName;
-  /** Compact label for chips and tags. */
-  shortLabel: string;
-  /** One-line explanation shown on the Home category tiles. */
-  blurb: string;
   /** Colour of this category's map pins and legend chip. */
   color: ColorToken;
 };
@@ -37,47 +39,24 @@ type CategoryMeta = {
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
   'Historical Site': {
     icon: 'bank-outline',
-    shortLabel: 'Historical',
-    blurb: 'Shrines and landmarks of the nation’s story',
     color: 'categoryHistorical',
   },
   'Church & Religious': {
     icon: 'church-outline',
-    shortLabel: 'Churches',
-    blurb: 'Centuries-old churches and places of faith',
     color: 'categoryChurch',
   },
   'Museum & Art': {
     icon: 'palette-outline',
-    shortLabel: 'Museums & Art',
-    blurb: 'Galleries, collections and ancient art',
     color: 'categoryMuseum',
   },
   'Natural Wonder': {
     icon: 'waterfall',
-    shortLabel: 'Nature',
-    blurb: 'Falls, lakes, volcanoes and mountains',
     color: 'categoryNature',
   },
   'Heritage Town & Culture': {
     icon: 'home-group',
-    shortLabel: 'Heritage & Culture',
-    blurb: 'Old towns, traditions and living culture',
     color: 'categoryHeritage',
   },
-};
-
-type ProvinceMeta = {
-  /** Short identity line shown on the Home province list. */
-  tagline: string;
-};
-
-export const PROVINCE_META: Record<Province, ProvinceMeta> = {
-  Cavite: { tagline: 'Cradle of the Revolution' },
-  Laguna: { tagline: 'Birthplace of José Rizal' },
-  Batangas: { tagline: 'Taal Lake and heritage towns' },
-  Rizal: { tagline: 'Cradle of Philippine art' },
-  Quezon: { tagline: 'Land of coconuts and fiestas' },
 };
 
 export function isProvince(value: unknown): value is Province {

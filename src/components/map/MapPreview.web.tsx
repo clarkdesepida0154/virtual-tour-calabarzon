@@ -5,11 +5,13 @@
 import { StyleSheet, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
-import { colors, layout, spacing } from '@/theme';
+import { layout, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
 
 import type { MapPreviewProps } from './types';
 
 export function MapPreview({ label }: MapPreviewProps) {
+  const styles = useStyles();
   return (
     <View style={styles.tile} accessible accessibilityLabel={label}>
       <View style={[styles.line, styles.lineH]} />
@@ -19,7 +21,7 @@ export function MapPreview({ label }: MapPreviewProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   tile: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.surfaceMuted,
@@ -43,4 +45,4 @@ const styles = StyleSheet.create({
     left: '50%',
     width: layout.hairline,
   },
-});
+}));

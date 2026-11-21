@@ -44,13 +44,13 @@ export function splitLead(text: string, maxLeadLength = 240): { lead: string | n
   return { lead: null, rest: trimmed };
 }
 
-/** "17 November 2026", or the raw value if it cannot be read as a date. */
-export function formatDate(value: string | null | undefined): string {
+/** "17 November 2026" (or the Filipino form), or the raw value if it cannot be read as a date. */
+export function formatDate(value: string | null | undefined, locale = 'en-PH'): string {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   try {
-    return date.toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
     return date.toISOString().slice(0, 10);
   }

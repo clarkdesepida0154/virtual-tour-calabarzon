@@ -5,7 +5,9 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconSizeToken } from '@/theme';
-import { colors, motion } from '@/theme';
+import { motion } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type Props = {
   uri: string | null | undefined;
@@ -22,6 +24,8 @@ type Props = {
  * quiet "no photo" mark when there is no image or it fails to load.
  */
 export function CoverImage({ uri, label, style, fallbackIconSize = 'xl', fit = 'cover' }: Props) {
+  const styles = useStyles();
+  const { t } = useI18n();
   // Remember which URL failed, so a new URL gets a fresh attempt.
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showFallback = !uri || failedUri === uri;
@@ -29,7 +33,7 @@ export function CoverImage({ uri, label, style, fallbackIconSize = 'xl', fit = '
   return (
     <View style={[styles.frame, style]}>
       {showFallback ? (
-        <View style={styles.fallback} accessible accessibilityLabel={`${label} — no photo`}>
+        <View style={styles.fallback} accessible accessibilityLabel={t('common.noPhoto', { label })}>
           <AppIcon name="image-off-outline" size={fallbackIconSize} color="muted" />
         </View>
       ) : (
@@ -48,7 +52,7 @@ export function CoverImage({ uri, label, style, fallbackIconSize = 'xl', fit = '
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   frame: {
     backgroundColor: colors.surfaceMuted,
     overflow: 'hidden',
@@ -58,4 +62,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

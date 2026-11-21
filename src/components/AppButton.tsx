@@ -1,9 +1,9 @@
-import { StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'react-native-paper';
 
 import type { IconName } from '@/components/AppIcon';
-import { colors, layout, radius, typography } from '@/theme';
+import { layout, radius, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'text';
 
@@ -36,6 +36,8 @@ export function AppButton({
   style,
   accessibilityHint,
 }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const isDanger = variant === 'danger';
 
   return (
@@ -55,7 +57,7 @@ export function AppButton({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   button: {
     borderRadius: radius.pill,
   },
@@ -68,4 +70,4 @@ const styles = StyleSheet.create({
   label: {
     ...typography.button,
   },
-});
+}));

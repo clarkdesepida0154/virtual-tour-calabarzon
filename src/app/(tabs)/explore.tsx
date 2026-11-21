@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { FAB } from 'react-native-paper';
 
 import { AppText } from '@/components/AppText';
@@ -14,22 +14,17 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SearchField } from '@/components/SearchField';
 import { DestinationCardSkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
-import { CATEGORIES, CATEGORY_META, PROVINCES, REGION_LABEL } from '@/constants/taxonomy';
+import { CATEGORIES, CATEGORY_META, PROVINCES } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
 import { useExploreFilters } from '@/context/ExploreFiltersContext';
 import { useUserLocation } from '@/context/LocationContext';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDestinations } from '@/hooks/useDestinations';
-import { pluralize } from '@/lib/format';
-import { distanceFrom, formatDistance, sortByDistance } from '@/lib/geo';
-import { colors, layout, motion, radius, spacing } from '@/theme';
+import { distanceFrom, sortByDistance } from '@/lib/geo';
+import { layout, motion, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { DestinationSummary } from '@/types/database';
-
-const CATEGORY_OPTIONS: FilterOption<Category>[] = CATEGORIES.map((category) => ({
-  value: category,
-  label: CATEGORY_META[category].shortLabel,
-  icon: CATEGORY_META[category].icon,
-}));
+import { useI18n } from '@/context/I18nContext';
 
 const PROVINCE_OPTIONS: FilterOption<Province>[] = PROVINCES.map((province) => ({
   value: province,
@@ -39,6 +34,14 @@ const PROVINCE_OPTIONS: FilterOption<Province>[] = PROVINCES.map((province) => (
 const SKELETON_COUNT = 3;
 
 export default function ExploreScreen() {
+  const styles = useStyles();
+  const { t, categoryLabel, distance } = useI18n();
+  const categoryOptions: FilterOption<Category>[] = CATEGORIES.map((category) => ({
+    value: category,
+    label: categoryLabel(category, 'short'),
+    icon: CATEGORY_META[category].icon,
+  }));
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { filters, activeCount, setQuery, toggleCategory, toggleProvince, clearFilters } =
     useExploreFilters();
@@ -78,33 +81,33 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader overline={REGION_LABEL} title="Explore" />
+      <ScreenHeader overline={t('common.region')} title={t('explore.title')} />
 
       <View style={styles.controls}>
         <SearchField
           value={filters.query}
           onChangeText={setQuery}
-          placeholder="Search by name or town"
+          placeholder={t('explore.searchPlaceholder')}
           style={styles.search}
         />
         <FilterChipRow
-          title="Category"
-          options={CATEGORY_OPTIONS}
+          title={t('explore.category')}
+          options={categoryOptions}
           selected={filters.category}
           onToggle={toggleCategory}
         />
         <FilterChipRow
-          title="Province"
+          title={t('explore.province')}
           options={PROVINCE_OPTIONS}
           selected={filters.province}
           onToggle={toggleProvince}
         />
       </View>
 
-      <LinearProgress visible={isUpdating} accessibilityLabel="Updating results" />
+      <LinearProgress visible={isUpdating} accessibilityLabel={t('explore.updatingA11y')} />
 
       {list.status === 'loading' ? (
-        <View style={styles.list} accessibilityLabel="Loading destinations">
+        <View style={styles.list} accessibilityLabel={t('explore.loadingA11y')}>
           {Array.from({ length: SKELETON_COUNT }, (_, index) => (
             <DestinationCardSkeleton key={index} />
           ))}
@@ -121,7 +124,7 @@ export default function ExploreScreen() {
               <DestinationCard
                 destination={item}
                 onPress={openDestination}
-                distance={km === null ? null : formatDistance(km)}
+                distance={km === null ? null : distance(km)}
               />
             );
           }}
@@ -146,13 +149,13 @@ export default function ExploreScreen() {
                 <View style={styles.summary}>
                   <AppText variant="label" color="inkSoft" style={styles.summaryText}>
                     {activeCount > 0
-                      ? `${pluralize(destinations.length, 'match', 'matches')} for your filters`
-                      : pluralize(destinations.length, 'destination')}
+                      ? t('explore.matches', { count: destinations.length })
+                      : t('explore.count', { count: destinations.length })}
                   </AppText>
                   {activeCount > 0 ? <ClearFiltersButton onPress={clearFilters} /> : null}
                   {location.isOffered ? (
                     <FilterChip
-                      label="Nearest first"
+                      label={t('explore.nearestFirst')}
                       icon="crosshairs-gps"
                       selected={sortNearest}
                       onPress={() => void toggleNearest()}
@@ -166,9 +169,9 @@ export default function ExploreScreen() {
             activeCount > 0 ? (
               <EmptyState
                 icon="map-search-outline"
-                title="No matches"
-                message="No destination fits that search and those filters. Try a different word, or widen the filters."
-                actionLabel="Clear filters"
+                title={t('explore.noMatches.title')}
+                message={t('explore.noMatches.message')}
+                actionLabel={t('explore.clearFilters')}
                 actionIcon="filter-remove-outline"
                 onAction={clearFilters}
                 style={styles.state}
@@ -176,9 +179,9 @@ export default function ExploreScreen() {
             ) : (
               <EmptyState
                 icon="map-search-outline"
-                title="No destinations yet"
-                message="The collection is empty. Add the first place worth visiting in CALABARZON."
-                actionLabel="Add a destination"
+                title={t('home.empty.title')}
+                message={t('home.empty.message')}
+                actionLabel={t('home.empty.action')}
                 actionIcon="plus"
                 onAction={() => router.push('/add')}
                 style={styles.state}
@@ -190,33 +193,35 @@ export default function ExploreScreen() {
 
       <FAB
         icon="plus"
-        label="Add"
+        label={t('explore.add')}
         onPress={() => router.push('/add')}
         color={colors.onPrimary}
         style={styles.fab}
-        accessibilityLabel="Add a destination"
-        accessibilityHint="Opens the form for a new destination"
+        accessibilityLabel={t('explore.addA11y')}
+        accessibilityHint={t('explore.addHint')}
       />
     </View>
   );
 }
 
 function ClearFiltersButton({ onPress }: { onPress: () => void }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
     <Pressable
       onPress={onPress}
       hitSlop={spacing.md}
       accessibilityRole="button"
-      accessibilityLabel="Clear all filters"
+      accessibilityLabel={t('explore.clearFiltersA11y')}
       style={({ pressed }) => pressed && styles.pressed}>
       <AppText variant="label" color="primary">
-        Clear filters
+        {t('explore.clearFilters')}
       </AppText>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -263,4 +268,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
   },
-});
+}));

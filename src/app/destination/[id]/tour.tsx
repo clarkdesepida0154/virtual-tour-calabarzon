@@ -9,21 +9,22 @@
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import { IconButton } from 'react-native-paper';
 import Animated, { FadeIn, FadeInDown, FadeInLeft, FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
 import { BestScoreBadge, PageDots, VisitedBadge } from '@/components/Badges';
 import { CoverImage } from '@/components/CoverImage';
+import { NarrationButton } from '@/components/NarrationButton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag } from '@/components/Tag';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
@@ -31,11 +32,13 @@ import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { useDestinationProgress } from '@/hooks/useProgress';
 import { openDirections, successFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
-import { formatDate, formatPlace, splitLead } from '@/lib/format';
+import { formatPlace, splitLead } from '@/lib/format';
 import { hasCoordinates } from '@/lib/mapRegion';
 import { progressRepository } from '@/repositories';
-import { colors, iconSize, layout, motion, radius, spacing } from '@/theme';
+import { iconSize, layout, motion, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { Destination, DestinationImage } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
 
 type Step = 'intro' | 'gallery' | 'history' | 'culture' | 'complete';
 
@@ -46,6 +49,9 @@ const DARK_STEPS: readonly Step[] = ['intro', 'gallery'];
 type Plate = { key: string; uri: string; caption: string | null };
 
 export default function VirtualTourScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -91,25 +97,25 @@ export default function VirtualTourScreen() {
     const missing = query.status === 'success';
     return (
       <View style={[styles.screen, failed || missing ? styles.paper : styles.wall]}>
-        <StatusBar style={failed || missing ? 'dark' : 'light'} />
+        <ThemedStatusBar overDark={!(failed || missing)} />
         <CloseButton onPress={close} top={insets.top} dark={!(failed || missing)} />
         {failed ? (
           <ErrorState error={query.error!} onRetry={query.retry} style={styles.centered} />
         ) : missing ? (
           <EmptyState
             icon="map-marker-off-outline"
-            title="Destination not found"
-            message="This place is no longer in the collection, so its tour can’t be shown."
-            actionLabel="Close"
+            title={t('tour.notFound.title')}
+            message={t('tour.notFound.message')}
+            actionLabel={t('common.close')}
             actionIcon="close"
             onAction={close}
             style={styles.centered}
           />
         ) : (
-          <View style={styles.loading} accessibilityLabel="Preparing the tour">
+          <View style={styles.loading} accessibilityLabel={t('tour.preparingA11y')}>
             <ActivityIndicator color={colors.secondary} size="large" />
             <AppText variant="tagline" color="onExhibitSoft">
-              Preparing the exhibit…
+              {t('tour.preparing')}
             </AppText>
           </View>
         )}
@@ -119,11 +125,15 @@ export default function VirtualTourScreen() {
 
   const entering = (direction === 'forward' ? FadeInRight : FadeInLeft).duration(motion.step);
   const nextLabel =
-    step === 'intro' ? 'Begin the tour' : steps[stepIndex + 1] === 'complete' ? 'Finish the tour' : 'Continue';
+    step === 'intro'
+      ? t('tour.intro.begin')
+      : steps[stepIndex + 1] === 'complete'
+        ? t('tour.finish')
+        : t('common.continue');
 
   return (
     <View style={[styles.screen, isDark ? styles.wall : styles.paper]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ThemedStatusBar overDark={isDark} />
 
       <Animated.View key={step} entering={entering} style={styles.flex}>
         {step === 'intro' ? (
@@ -133,7 +143,7 @@ export default function VirtualTourScreen() {
         ) : step === 'history' ? (
           <ChapterStep
             numeral="I"
-            title="History"
+            title={t('details.history')}
             icon="book-open-page-variant-outline"
             body={destination.history ?? ''}
             plate={plates[1] ?? plates[0]}
@@ -142,7 +152,7 @@ export default function VirtualTourScreen() {
         ) : step === 'culture' ? (
           <ChapterStep
             numeral={steps.includes('history') ? 'II' : 'I'}
-            title="Cultural Significance"
+            title={t('details.culture')}
             icon="drama-masks"
             body={destination.cultural_significance ?? ''}
             plate={plates[2] ?? plates[1] ?? plates[0]}
@@ -166,7 +176,7 @@ export default function VirtualTourScreen() {
         <View
           style={styles.segments}
           accessible
-          accessibilityLabel={`Step ${stepIndex + 1} of ${steps.length}`}>
+          accessibilityLabel={t('tour.stepOf', { index: stepIndex + 1, count: steps.length })}>
           {steps.map((name, index) => (
             <View
               key={name}
@@ -194,14 +204,14 @@ export default function VirtualTourScreen() {
             { paddingBottom: insets.bottom + spacing.md },
           ]}>
           {stepIndex > 0 ? (
-            <IconButton
+            <AppIconButton
               icon="arrow-left"
               mode="contained"
               size={iconSize.md}
               containerColor={isDark ? colors.glass : colors.surface}
-              iconColor={isDark ? colors.onPrimary : colors.ink}
+              iconColor={isDark ? colors.onPhoto : colors.ink}
               onPress={() => go(-1)}
-              accessibilityLabel="Previous step"
+              accessibilityLabel={t('tour.previousStep')}
               style={!isDark && styles.outlined}
             />
           ) : null}
@@ -230,12 +240,15 @@ function IntroStep({
   cover: Plate | undefined;
   visited: boolean;
 }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.flex}>
       <CoverImage
         uri={cover?.uri ?? destination.cover_image_url}
-        label={`Photo of ${destination.name}`}
+        label={t('common.photoOf', { name: destination.name })}
         fallbackIconSize="xxl"
         style={StyleSheet.absoluteFill}
       />
@@ -253,10 +266,10 @@ function IntroStep({
           <View style={styles.introOverline}>
             <View style={styles.introRule} />
             <AppText variant="overline" color="secondary">
-              A virtual tour
+              {t('tour.intro.overline')}
             </AppText>
           </View>
-          <AppText variant="exhibitTitle" color="onPrimary" accessibilityRole="header">
+          <AppText variant="exhibitTitle" color="onPhoto" accessibilityRole="header">
             {destination.name}
           </AppText>
           <View style={styles.introMeta}>
@@ -265,7 +278,7 @@ function IntroStep({
           </View>
           <View style={styles.introPlace}>
             <AppIcon name="map-marker-outline" size="sm" color="secondary" />
-            <AppText variant="subtitle" color="onPrimaryMuted">
+            <AppText variant="subtitle" color="onPhotoMuted">
               {formatPlace(destination)}
             </AppText>
           </View>
@@ -280,6 +293,9 @@ function IntroStep({
 }
 
 function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }) {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const { colors } = useAppTheme();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<Plate> | null>(null);
@@ -305,10 +321,10 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
     <View style={[styles.flex, { paddingTop: topInset + layout.topBarHeight }]}>
       <View style={styles.galleryHeader}>
         <AppText variant="overline" color="secondary">
-          The gallery
+          {t('tour.gallery.overline')}
         </AppText>
-        <AppText variant="chapterTitle" color="onPrimary" accessibilityRole="header">
-          Through the lens
+        <AppText variant="chapterTitle" color="onPhoto" accessibilityRole="header">
+          {t('tour.gallery.title')}
         </AppText>
       </View>
 
@@ -329,7 +345,7 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
             <View style={{ width, height: frameHeight }}>
               <CoverImage
                 uri={item.uri}
-                label={`Photo ${itemIndex + 1} of ${plates.length}`}
+                label={t('tour.gallery.photoOf', { index: itemIndex + 1, count: plates.length })}
                 fallbackIconSize="xxl"
                 style={[StyleSheet.absoluteFill, styles.plateFrame]}
                 fit="contain"
@@ -340,26 +356,26 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
         {plates.length > 1 ? (
           <>
             {index > 0 ? (
-              <IconButton
+              <AppIconButton
                 icon="chevron-left"
                 mode="contained"
                 size={iconSize.md}
                 containerColor={colors.glass}
-                iconColor={colors.onPrimary}
+                iconColor={colors.onPhoto}
                 onPress={() => showPlate(index - 1)}
-                accessibilityLabel="Previous photo"
+                accessibilityLabel={t('tour.gallery.previousPhoto')}
                 style={[styles.plateArrow, styles.plateArrowLeft]}
               />
             ) : null}
             {index < plates.length - 1 ? (
-              <IconButton
+              <AppIconButton
                 icon="chevron-right"
                 mode="contained"
                 size={iconSize.md}
                 containerColor={colors.glass}
-                iconColor={colors.onPrimary}
+                iconColor={colors.onPhoto}
                 onPress={() => showPlate(index + 1)}
-                accessibilityLabel="Next photo"
+                accessibilityLabel={t('tour.gallery.nextPhoto')}
                 style={[styles.plateArrow, styles.plateArrowRight]}
               />
             ) : null}
@@ -370,7 +386,7 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
       <View style={[styles.plateFooter, { paddingBottom: insets.bottom + layout.actionBarHeight + spacing.lg }]}>
         <PageDots count={plates.length} index={index} />
         <AppText variant="label" color="onExhibitSoft">
-          Plate {index + 1} of {plates.length} · swipe to browse
+          {t('tour.gallery.plate', { index: index + 1, count: plates.length })}
         </AppText>
         {current?.caption ? <Credit caption={current.caption} dark /> : null}
       </View>
@@ -393,6 +409,8 @@ function ChapterStep({
   plate: Plate | undefined;
   topInset: number;
 }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const { lead, rest } = splitLead(body);
   const paragraphs = rest.split(/\n{2,}/).filter(Boolean);
@@ -412,7 +430,7 @@ function ChapterStep({
           <AppIcon name={icon} size="md" color="secondaryDark" />
         </View>
         <AppText variant="overline" color="secondaryDark">
-          Chapter {numeral}
+          {t(numeral === 'I' ? 'tour.chapter.one' : 'tour.chapter.two')}
         </AppText>
         <AppText variant="chapterTitle" accessibilityRole="header" align="center">
           {title}
@@ -422,11 +440,13 @@ function ChapterStep({
           <AppIcon name="rhombus-medium" size="xs" color="secondary" />
           <View style={styles.ornamentLine} />
         </View>
+        {/* Museum audio guide: reads this chapter aloud (hidden without a voice). */}
+        <NarrationButton text={`${title}. ${body}`} />
       </View>
 
       {plate ? (
         <View style={styles.chapterPlate}>
-          <CoverImage uri={plate.uri} label={`Photo for ${title}`} style={styles.chapterPhoto} />
+          <CoverImage uri={plate.uri} label={t('tour.chapter.photoFor', { title })} style={styles.chapterPhoto} />
           {plate.caption ? <Credit caption={plate.caption} /> : null}
         </View>
       ) : null}
@@ -462,7 +482,9 @@ function CompletionStep({
   bottomInset: number;
   onClose: () => void;
 }) {
+  const styles = useStyles();
   const router = useRouter();
+  const { t, errorMessage, date } = useI18n();
   const { userKey } = useIdentity();
   const { notifyChanged } = useDataSync();
   const { showToast } = useToast();
@@ -471,7 +493,7 @@ function CompletionStep({
   const [justVisitedAt, setJustVisitedAt] = useState<string | null>(null);
 
   const isVisited = visited || justVisitedAt !== null;
-  const dateLabel = formatDate(visitedAt ?? justVisitedAt);
+  const dateLabel = date(visitedAt ?? justVisitedAt);
 
   const markVisited = async () => {
     if (saving) return;
@@ -482,7 +504,7 @@ function CompletionStep({
       successFeedback();
       notifyChanged();
     } catch (cause) {
-      showToast(toAppError(cause, 'We couldn’t mark this destination as visited.').message);
+      showToast(errorMessage(toAppError(cause, 'markVisited')));
     } finally {
       setSaving(false);
     }
@@ -492,7 +514,7 @@ function CompletionStep({
     router.replace({ pathname: '/destination/[id]/quiz', params: { id: destination.id } });
 
   const getDirections = async () => {
-    if (!(await openDirections(destination))) showToast('We couldn’t open Google Maps on this device.');
+    if (!(await openDirections(destination))) showToast(t('details.directionsFailed'));
   };
 
   return (
@@ -511,10 +533,10 @@ function CompletionStep({
       </View>
 
       <AppText variant="overline" color="secondaryDark" align="center">
-        Tour complete
+        {t('tour.complete.overline')}
       </AppText>
       <AppText variant="chapterTitle" align="center" accessibilityRole="header">
-        You have toured {destination.name}
+        {t('tour.complete.title', { name: destination.name })}
       </AppText>
       <View style={styles.rule} />
 
@@ -523,18 +545,18 @@ function CompletionStep({
           <AppIcon name="map-marker-check" size="lg" color="success" />
           <View style={styles.flex}>
             <AppText variant="subtitle" color="success">
-              Added to your visited places
+              {t('tour.complete.visited')}
             </AppText>
             {dateLabel ? (
               <AppText variant="caption" color="inkSoft">
-                Visited on {dateLabel}
+                {t('tour.complete.visitedOn', { date: dateLabel })}
               </AppText>
             ) : null}
           </View>
         </Animated.View>
       ) : (
         <AppText variant="bodyLarge" color="inkSoft" align="center">
-          Record this stop on your journey. It counts toward your progress across the five provinces.
+          {t('tour.complete.record')}
         </AppText>
       )}
 
@@ -546,37 +568,37 @@ function CompletionStep({
 
       <View style={styles.completeActions}>
         {!isVisited ? (
-          <AppButton label="Mark as Visited" icon="map-marker-check-outline" onPress={markVisited} loading={saving} />
+          <AppButton label={t('tour.complete.markVisited')} icon="map-marker-check-outline" onPress={markVisited} loading={saving} />
         ) : null}
         <AppButton
-          label={best ? 'Retake the Quiz' : 'Take the Quiz'}
+          label={t(best ? 'tour.complete.retakeQuiz' : 'tour.complete.takeQuiz')}
           icon="help-circle-outline"
           variant={isVisited ? 'primary' : 'secondary'}
           onPress={takeQuiz}
           disabled={saving}
-          accessibilityHint="Five questions about what you just read"
+          accessibilityHint={t('tour.complete.quizHint')}
         />
-        <AppButton label="Back to the destination" variant="text" onPress={onClose} disabled={saving} />
+        <AppButton label={t('tour.complete.backToDestination')} variant="text" onPress={onClose} disabled={saving} />
       </View>
 
       {hasCoordinates(destination) ? (
         <View style={styles.visitCard}>
           <AppIcon name="directions" size="lg" color="primary" />
           <View style={styles.flex}>
-            <AppText variant="subtitle">You’ve toured it virtually — visit it in person</AppText>
+            <AppText variant="subtitle">{t('tour.complete.visitTitle')}</AppText>
             <AppText variant="caption" color="inkSoft">
-              Google Maps will plan the trip from where you are now.
+              {t('tour.complete.visitBody')}
             </AppText>
           </View>
         </View>
       ) : null}
       {hasCoordinates(destination) ? (
         <AppButton
-          label="Get directions"
+          label={t('details.getDirections')}
           icon="directions"
           variant="secondary"
           onPress={() => void getDirections()}
-          accessibilityHint="Opens Google Maps with directions from where you are"
+          accessibilityHint={t('details.directionsHint')}
         />
       ) : null}
     </ScrollView>
@@ -588,15 +610,18 @@ function CompletionStep({
 // ---------------------------------------------------------------------------
 
 function CloseButton({ onPress, dark, top }: { onPress: () => void; dark: boolean; top?: number }) {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const { colors } = useAppTheme();
   return (
-    <IconButton
+    <AppIconButton
       icon="close"
       mode="contained"
       size={iconSize.md}
       containerColor={dark ? colors.glass : colors.surface}
-      iconColor={dark ? colors.onPrimary : colors.ink}
+      iconColor={dark ? colors.onPhoto : colors.ink}
       onPress={onPress}
-      accessibilityLabel="Close the tour"
+      accessibilityLabel={t('tour.closeA11y')}
       style={top !== undefined ? [styles.floatingClose, { top: top + spacing.sm }] : undefined}
     />
   );
@@ -604,6 +629,7 @@ function CloseButton({ onPress, dark, top }: { onPress: () => void; dark: boolea
 
 /** The photo credit required by the licence, as a quiet caption. */
 function Credit({ caption, dark = false }: { caption: string; dark?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={styles.credit}>
       <AppIcon name="camera-outline" size="xs" color={dark ? 'onExhibitSoft' : 'muted'} />
@@ -631,7 +657,7 @@ function buildSteps(destination: Destination | null | undefined, plates: Plate[]
   return steps;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
   },
@@ -871,4 +897,4 @@ const styles = StyleSheet.create({
     borderWidth: layout.hairline,
     borderColor: colors.outline,
   },
-});
+}));

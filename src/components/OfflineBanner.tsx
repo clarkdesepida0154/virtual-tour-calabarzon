@@ -1,11 +1,13 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useShowingSavedData } from '@/lib/appCache';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 /**
  * A quiet strip shown while the screens are serving the saved catalogue
@@ -13,6 +15,8 @@ import { colors, layout, radius, spacing } from '@/theme';
  * first successful network read hides the strip again.
  */
 export function OfflineBanner({ style }: { style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   const showing = useShowingSavedData();
   const { notifyChanged } = useDataSync();
   if (!showing) return null;
@@ -22,26 +26,26 @@ export function OfflineBanner({ style }: { style?: StyleProp<ViewStyle> }) {
       style={[styles.banner, style]}
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      accessibilityLabel="Offline. Showing saved data.">
+      accessibilityLabel={t('offline.bannerA11y')}>
       <AppIcon name="cloud-off-outline" size="sm" color="inkSoft" />
       <AppText variant="label" color="inkSoft" style={styles.text}>
-        Offline — showing saved data
+        {t('offline.banner')}
       </AppText>
       <Pressable
         onPress={notifyChanged}
         hitSlop={spacing.md}
         accessibilityRole="button"
-        accessibilityLabel="Try to reconnect"
+        accessibilityLabel={t('offline.retryA11y')}
         style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
         <AppText variant="label" color="primary">
-          Retry
+          {t('common.retry')}
         </AppText>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -62,4 +66,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: layout.pressedOpacity,
   },
-});
+}));

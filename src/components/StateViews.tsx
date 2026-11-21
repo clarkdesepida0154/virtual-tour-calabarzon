@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
@@ -6,7 +6,9 @@ import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import type { AppError } from '@/lib/errors';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type MessageProps = {
   icon: IconName;
@@ -29,6 +31,7 @@ function Message({
   tone = 'neutral',
   style,
 }: MessageProps) {
+  const styles = useStyles();
   const isError = tone === 'error';
   return (
     <View style={[styles.container, style]}>
@@ -69,12 +72,13 @@ type ErrorStateProps = {
 
 /** Explains what went wrong in plain language and always offers a retry. */
 export function ErrorState({ error, onRetry, style }: ErrorStateProps) {
+  const { t, errorTitle, errorMessage } = useI18n();
   return (
     <Message
       icon={error.kind === 'network' ? 'wifi-off' : 'alert-circle-outline'}
-      title={error.title}
-      message={error.message}
-      actionLabel="Try again"
+      title={errorTitle(error)}
+      message={errorMessage(error)}
+      actionLabel={t('common.tryAgain')}
       actionIcon="refresh"
       onAction={onRetry}
       tone="error"
@@ -83,7 +87,7 @@ export function ErrorState({ error, onRetry, style }: ErrorStateProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -111,4 +115,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     alignSelf: 'center',
   },
-});
+}));

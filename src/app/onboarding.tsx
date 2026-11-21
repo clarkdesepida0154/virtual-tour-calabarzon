@@ -1,7 +1,6 @@
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import type { ComponentRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,40 +8,23 @@ import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { REGION_LABEL } from '@/constants/taxonomy';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { useI18n } from '@/context/I18nContext';
 import { useIdentity } from '@/context/IdentityContext';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
 
 type Slide = {
+  key: 'tours' | 'learn' | 'journey';
   numeral: string;
   icon: IconName;
-  overline: string;
-  title: string;
-  body: string;
 };
 
+/** The words live in the dictionaries (`onboarding.slides.<key>`). */
 const SLIDES: readonly Slide[] = [
-  {
-    numeral: 'I',
-    icon: 'bank-outline',
-    overline: 'Virtual tours',
-    title: 'Step inside the region',
-    body: 'Walk through 26 shrines, churches, falls and heritage towns of CALABARZON as a guided exhibit — photographs, history and cultural significance, one chapter at a time.',
-  },
-  {
-    numeral: 'II',
-    icon: 'school-outline',
-    overline: 'Learn & quiz',
-    title: 'Read, then test yourself',
-    body: 'Every destination ends with a five-question quiz drawn from what you have just read. Retake it as often as you like — your best score is kept.',
-  },
-  {
-    numeral: 'III',
-    icon: 'map-marker-path',
-    overline: 'Your journey',
-    title: 'Track where you have been',
-    body: 'Mark places as visited, save favorites and watch each province fill up. When you are ready, get directions and see it in person.',
-  },
+  { key: 'tours', numeral: 'I', icon: 'bank-outline' },
+  { key: 'learn', numeral: 'II', icon: 'school-outline' },
+  { key: 'journey', numeral: 'III', icon: 'map-marker-path' },
 ];
 
 /**
@@ -51,9 +33,11 @@ const SLIDES: readonly Slide[] = [
  * root stack then moves on to Welcome by itself.
  */
 export default function OnboardingScreen() {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { finishOnboarding } = useIdentity();
+  const { t } = useI18n();
   const [index, setIndex] = useState(0);
   const [scroller, setScroller] = useState<ComponentRef<typeof ScrollView> | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -78,21 +62,21 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + spacing.lg }]}>
-      <StatusBar style="dark" />
+      <ThemedStatusBar />
 
       <View style={styles.topBar}>
         <AppText variant="overline" color="secondaryDark" style={styles.flex}>
-          {REGION_LABEL}
+          {t('common.region')}
         </AppText>
         {!isLast ? (
           <Pressable
             onPress={finish}
             hitSlop={spacing.md}
             accessibilityRole="button"
-            accessibilityLabel="Skip the introduction"
+            accessibilityLabel={t('onboarding.skipA11y')}
             style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
             <AppText variant="label" color="primary">
-              Skip
+              {t('onboarding.skip')}
             </AppText>
           </Pressable>
         ) : null}
@@ -105,9 +89,9 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
         style={styles.flex}
-        accessibilityLabel="Introduction">
+        accessibilityLabel={t('onboarding.carouselA11y')}>
         {SLIDES.map((slide, slideIndex) => (
-          <SlideView key={slide.numeral} slide={slide} width={width} hidden={slideIndex !== index} />
+          <SlideView key={slide.key} slide={slide} width={width} hidden={slideIndex !== index} />
         ))}
       </ScrollView>
 
@@ -116,13 +100,13 @@ export default function OnboardingScreen() {
           style={styles.dots}
           accessible
           accessibilityRole="progressbar"
-          accessibilityLabel={`Slide ${index + 1} of ${SLIDES.length}`}>
+          accessibilityLabel={t('onboarding.slideOf', { index: index + 1, count: SLIDES.length })}>
           {SLIDES.map((slide, dotIndex) => (
             <View key={slide.numeral} style={[styles.dot, dotIndex === index && styles.dotActive]} />
           ))}
         </View>
         <AppButton
-          label={isLast ? 'Get started' : 'Next'}
+          label={t(isLast ? 'onboarding.getStarted' : 'onboarding.next')}
           icon={isLast ? 'check' : 'arrow-right'}
           onPress={isLast ? finish : () => goTo(index + 1)}
           loading={isLeaving}
@@ -134,6 +118,8 @@ export default function OnboardingScreen() {
 }
 
 function SlideView({ slide, width, hidden }: { slide: Slide; width: number; hidden: boolean }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
     <View
       style={[styles.slide, { width }]}
@@ -150,21 +136,21 @@ function SlideView({ slide, width, hidden }: { slide: Slide; width: number; hidd
 
       <View style={styles.copy}>
         <AppText variant="overline" color="secondaryDark" align="center">
-          {slide.overline}
+          {t(`onboarding.slides.${slide.key}.overline`)}
         </AppText>
         <AppText variant="hero" align="center" accessibilityRole="header">
-          {slide.title}
+          {t(`onboarding.slides.${slide.key}.title`)}
         </AppText>
         <View style={styles.rule} />
         <AppText variant="bodyLarge" color="inkSoft" align="center">
-          {slide.body}
+          {t(`onboarding.slides.${slide.key}.body`)}
         </AppText>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -253,4 +239,4 @@ const styles = StyleSheet.create({
   button: {
     alignSelf: 'stretch',
   },
-});
+}));

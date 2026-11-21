@@ -8,7 +8,9 @@ import { AppText } from '@/components/AppText';
 import { CoverImage } from '@/components/CoverImage';
 import { COVER_MAX_DIMENSION, pickCoverPhoto } from '@/lib/coverPhoto';
 import type { PreparedPhoto } from '@/lib/coverPhoto';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 /** What the form currently holds as the destination's cover photo. */
 export type CoverState =
@@ -26,6 +28,9 @@ type Props = {
 
 /** Photo picker with a 16:10 preview. Resizes the chosen photo right away. */
 export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const [isPreparing, setIsPreparing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -50,10 +55,10 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
     <View style={styles.container}>
       {previewUri ? (
         <View>
-          <CoverImage uri={previewUri} label="Selected cover photo" style={styles.preview} />
+          <CoverImage uri={previewUri} label={t('form.photo.selected')} style={styles.preview} />
           {isPreparing ? (
             <View style={styles.busyOverlay}>
-              <ActivityIndicator color={colors.onPrimary} />
+              <ActivityIndicator color={colors.onPhoto} />
             </View>
           ) : null}
         </View>
@@ -62,14 +67,14 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
           onPress={choosePhoto}
           disabled={disabled || isPreparing}
           accessibilityRole="button"
-          accessibilityLabel="Add a cover photo"
-          accessibilityHint="Opens your photo library"
+          accessibilityLabel={t('form.photo.add')}
+          accessibilityHint={t('form.photo.addHint')}
           style={({ pressed }) => [styles.placeholder, pressed && styles.pressed]}>
           {isPreparing ? (
             <>
               <ActivityIndicator color={colors.primary} />
               <AppText variant="label" color="inkSoft">
-                Preparing photo…
+                {t('form.photo.preparing')}
               </AppText>
             </>
           ) : (
@@ -77,7 +82,7 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
               <View style={styles.badge}>
                 <AppIcon name="camera-plus-outline" size="lg" color="primary" />
               </View>
-              <AppText variant="subtitle">Add a cover photo</AppText>
+              <AppText variant="subtitle">{t('form.photo.add')}</AppText>
               <AppText variant="caption" color="inkSoft" align="center">
                 Choose from your gallery. It is resized to {COVER_MAX_DIMENSION}px before upload.
               </AppText>
@@ -89,7 +94,7 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
       {previewUri ? (
         <View style={styles.actions}>
           <AppButton
-            label="Change photo"
+            label={t('form.photo.change')}
             icon="image-edit-outline"
             variant="secondary"
             onPress={choosePhoto}
@@ -97,7 +102,7 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
             style={styles.action}
           />
           <AppButton
-            label="Remove"
+            label={t('form.photo.remove')}
             icon="close"
             variant="text"
             onPress={() => onChange({ kind: 'none' })}
@@ -128,7 +133,7 @@ export function CoverPhotoField({ cover, onChange, disabled = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     gap: spacing.md,
   },
@@ -184,4 +189,4 @@ const styles = StyleSheet.create({
   noteText: {
     flex: 1,
   },
-});
+}));

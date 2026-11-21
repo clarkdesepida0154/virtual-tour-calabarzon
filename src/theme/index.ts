@@ -1,84 +1,29 @@
 /**
  * Design system — the single source of truth for every colour, font, size,
- * radius and shadow in the app. Screens and components import tokens from
- * here; nothing else may hardcode a colour or a font size.
+ * radius and shadow in the app. Screens and components never hardcode a
+ * colour or a font size.
  *
- * Aesthetic: heritage museum (terracotta + gold on warm cream, serif titles).
- * Light theme only.
+ * Static tokens (spacing, radius, sizes, motion, typography) are plain
+ * exports. Colours, shadows, the map style and the Paper / navigation themes
+ * depend on the active theme (light or dark): read them with `useAppTheme()`
+ * or build styles with `makeStyles()` from `@/theme/ThemeProvider`.
+ *
+ * Aesthetic: heritage museum (terracotta + gold on warm cream; deep warm
+ * browns in dark mode, serif titles).
  */
-import { DefaultTheme as NavigationDefaultTheme } from 'expo-router';
+import { DarkTheme as NavigationDarkTheme, DefaultTheme as NavigationDefaultTheme } from 'expo-router';
 import type { TextStyle, ViewStyle } from 'react-native';
-import { MD3LightTheme, configureFonts } from 'react-native-paper';
+import { MD3DarkTheme, MD3LightTheme, configureFonts } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 
-// ---------------------------------------------------------------------------
-// Colour
-// ---------------------------------------------------------------------------
+import { darkMapStyle, lightMapStyle } from '@/theme/mapStyles';
+import type { MapStyleElement } from '@/theme/mapStyles';
+import { darkPalette, lightPalette } from '@/theme/palettes';
+import type { Palette } from '@/theme/palettes';
 
-export const colors = {
-  /** Terracotta — brand, primary actions, selected states. */
-  primary: '#9A3B26',
-  primaryDark: '#7A2D1C',
-  primarySoft: '#F5E4DD',
-  onPrimary: '#FFFFFF',
-  onPrimaryMuted: 'rgba(255, 255, 255, 0.84)',
+export type { ColorToken, Palette } from '@/theme/palettes';
+export type ColorScheme = 'light' | 'dark';
 
-  /** Heritage gold — accents, ornaments, category marks. */
-  secondary: '#C9A227',
-  secondaryDark: '#8A6D10',
-  secondarySoft: '#F8F1DA',
-
-  /** Warm cream page, white cards. */
-  background: '#FAF6EF',
-  surface: '#FFFFFF',
-  surfaceMuted: '#F2EADC',
-
-  /** Text. */
-  ink: '#2A2420',
-  inkSoft: '#5C5149',
-  muted: '#8A8178',
-
-  /** Lines. */
-  outline: '#E8DFD0',
-  outlineStrong: '#CFC3B1',
-
-  /** Feedback. */
-  success: '#2F5D46',
-  successSoft: '#DFEBE3',
-  error: '#B3261E',
-  errorSoft: '#FBE9E7',
-
-  /** Overlays on photos. */
-  scrim: 'rgba(42, 36, 32, 0.55)',
-  photoShadeNone: 'rgba(42, 36, 32, 0)',
-  photoShadeSoft: 'rgba(42, 36, 32, 0.45)',
-  photoShadeStrong: 'rgba(42, 36, 32, 0.88)',
-  pressed: 'rgba(42, 36, 32, 0.08)',
-
-  /** The dark "gallery wall" behind full-bleed photos in the virtual tour. */
-  exhibit: '#1C1814',
-  onExhibitSoft: 'rgba(255, 255, 255, 0.64)',
-  onExhibitFaint: 'rgba(255, 255, 255, 0.32)',
-  /** Frosted round buttons laid over photos. */
-  glass: 'rgba(28, 24, 20, 0.48)',
-
-  /**
-   * One colour per destination category, for map pins and the map legend.
-   * Each sits on a clearly different hue, because Google Maps tints its
-   * default pins by hue only.
-   */
-  categoryHistorical: '#9A3B26',
-  categoryChurch: '#6B4E8C',
-  categoryMuseum: '#C9A227',
-  categoryNature: '#2F5D46',
-  categoryHeritage: '#2E6C8E',
-
-  transparent: 'transparent',
-} as const;
-
-export type ColorToken = keyof typeof colors;
-
-// ---------------------------------------------------------------------------
 // Spacing (4/8pt scale), radius, sizes
 // ---------------------------------------------------------------------------
 
@@ -120,8 +65,11 @@ export type IconSizeToken = keyof typeof iconSize;
 export const layout = {
   /** Minimum comfortable touch target. */
   touchTarget: 48,
+  /** Smallest allowed touch target (WCAG 2.5.8 / Apple HIG 44 pt). */
+  touchTargetCompact: 44,
   hairline: 1,
-  chipHeight: 38,
+  /** Filter / legend chips: at least the compact touch target. */
+  chipHeight: 44,
   searchBarHeight: 56,
   tabBarHeight: 64,
   topBarHeight: 56,
@@ -150,6 +98,14 @@ export const layout = {
   /** Dialogs never grow taller than this share of the screen. */
   dialogMaxHeightRatio: 0.6,
   pressedOpacity: 0.86,
+  /** Custom map pins: head diameter (normal / selected), rim, pointer, shadow room. */
+  pinHead: 30,
+  pinHeadSelected: 40,
+  pinRimWidth: 2,
+  pinPointer: 8,
+  pinShadowRoom: 4,
+  /** Category swatch (with icon) and count badge on the map legend chips. */
+  legendSwatch: 24,
   /** Small map card on the Details screen. */
   mapPreviewHeight: 168,
   /** Diameter and stroke of the Progress tab's completion ring. */
@@ -170,6 +126,11 @@ export const layout = {
   fabClearance: 96,
   /** Province completion bars on the Progress tab. */
   meterHeight: 8,
+  /** Width of the "Cover" / "Gallery 2" label column on the Photo Credits screen. */
+  creditLabelWidth: 84,
+  /** Icon box and pulse ring of the narration ("Listen") button. */
+  narrationIcon: 28,
+  narrationRingWidth: 2,
   /** The framed plate on each onboarding slide. */
   onboardingPlate: 184,
   /** Gold ring drawn just inside the onboarding plate. */
@@ -186,18 +147,11 @@ export const motion = {
   step: 320,
   /** Map camera moves. */
   camera: 600,
+  /** How long a custom map marker keeps re-rendering after it changes (then it is frozen). */
+  markerSettle: 400,
+  /** One beat of the narration button's pulse while it speaks. */
+  narrationPulse: 900,
 } as const;
-
-// ---------------------------------------------------------------------------
-// Elevation (soft, warm shadows)
-// ---------------------------------------------------------------------------
-
-export const elevation = {
-  none: {},
-  card: { boxShadow: '0px 2px 10px rgba(42, 36, 32, 0.08)' },
-  raised: { boxShadow: '0px 6px 20px rgba(42, 36, 32, 0.14)' },
-  bar: { boxShadow: '0px -2px 12px rgba(42, 36, 32, 0.08)' },
-} satisfies Record<string, ViewStyle>;
 
 // ---------------------------------------------------------------------------
 // Typography
@@ -262,26 +216,6 @@ export type TypographyToken = keyof typeof typography;
 export const maxFontScale = 1.3;
 
 // ---------------------------------------------------------------------------
-// Google Maps style (Android): warm, quiet base map so the pins carry colour
-// ---------------------------------------------------------------------------
-
-export const mapStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#F2EADC' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#5C5149' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#FAF6EF' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#FFFFFF' }] },
-  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#E8DFD0' }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#CFC3B1' }] },
-  { featureType: 'administrative.province', elementType: 'labels.text.fill', stylers: [{ color: '#8A6D10' }] },
-  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#EDE4D3' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C8D9DE' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5B7C86' }] },
-];
-
-// ---------------------------------------------------------------------------
 // react-native-paper (Material Design 3) theme
 // ---------------------------------------------------------------------------
 
@@ -310,70 +244,127 @@ function buildPaperFonts(): MD3Theme['fonts'] {
   return configureFonts({ config });
 }
 
-export const paperTheme: MD3Theme = {
-  ...MD3LightTheme,
-  dark: false,
-  roundness: 4,
-  fonts: buildPaperFonts(),
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: colors.primary,
-    onPrimary: colors.onPrimary,
-    primaryContainer: colors.primarySoft,
-    onPrimaryContainer: colors.primaryDark,
-    secondary: colors.secondaryDark,
-    onSecondary: colors.onPrimary,
-    secondaryContainer: colors.secondarySoft,
-    onSecondaryContainer: colors.ink,
-    tertiary: colors.success,
-    onTertiary: colors.onPrimary,
-    tertiaryContainer: colors.successSoft,
-    onTertiaryContainer: colors.success,
-    error: colors.error,
-    onError: colors.onPrimary,
-    errorContainer: colors.errorSoft,
-    onErrorContainer: colors.error,
-    background: colors.background,
-    onBackground: colors.ink,
-    surface: colors.surface,
-    onSurface: colors.ink,
-    surfaceVariant: colors.surfaceMuted,
-    onSurfaceVariant: colors.inkSoft,
-    outline: colors.outlineStrong,
-    outlineVariant: colors.outline,
-    shadow: colors.ink,
-    scrim: colors.ink,
-    inverseSurface: colors.ink,
-    inverseOnSurface: colors.background,
-    inversePrimary: colors.secondary,
-    surfaceDisabled: colors.pressed,
-    onSurfaceDisabled: colors.muted,
-    backdrop: colors.scrim,
-    elevation: {
-      level0: colors.transparent,
-      level1: colors.surface,
-      level2: colors.surface,
-      level3: colors.surface,
-      level4: colors.surface,
-      level5: colors.surface,
-    },
-  },
+// ---------------------------------------------------------------------------
+// Theme-dependent tokens
+// ---------------------------------------------------------------------------
+
+export type Elevation = {
+  none: ViewStyle;
+  card: ViewStyle;
+  raised: ViewStyle;
+  bar: ViewStyle;
 };
 
-// ---------------------------------------------------------------------------
-// Navigation theme (expo-router / React Navigation)
-// ---------------------------------------------------------------------------
+/** Soft, warm shadows; deeper on dark surfaces so cards still lift. */
+function buildElevation(palette: Palette): Elevation {
+  return {
+    none: {},
+    card: { boxShadow: `0px 2px 10px ${palette.shadow}` },
+    raised: { boxShadow: `0px 6px 20px ${palette.shadowStrong}` },
+    bar: { boxShadow: `0px -2px 12px ${palette.shadow}` },
+  };
+}
 
-export const navigationTheme: typeof NavigationDefaultTheme = {
-  ...NavigationDefaultTheme,
-  dark: false,
-  colors: {
-    ...NavigationDefaultTheme.colors,
-    primary: colors.primary,
-    background: colors.background,
-    card: colors.surface,
-    text: colors.ink,
-    border: colors.outline,
-    notification: colors.primary,
-  },
+function buildPaperTheme(colors: Palette, scheme: ColorScheme): MD3Theme {
+  const base = scheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
+  return {
+    ...base,
+    dark: scheme === 'dark',
+    roundness: 4,
+    fonts: buildPaperFonts(),
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      onPrimary: colors.onPrimary,
+      primaryContainer: colors.primarySoft,
+      onPrimaryContainer: colors.primaryDark,
+      secondary: colors.secondaryDark,
+      onSecondary: colors.onPrimary,
+      secondaryContainer: colors.secondarySoft,
+      onSecondaryContainer: colors.ink,
+      tertiary: colors.success,
+      onTertiary: colors.onPrimary,
+      tertiaryContainer: colors.successSoft,
+      onTertiaryContainer: colors.success,
+      error: colors.error,
+      onError: colors.onPrimary,
+      errorContainer: colors.errorSoft,
+      onErrorContainer: colors.error,
+      background: colors.background,
+      onBackground: colors.ink,
+      surface: colors.surface,
+      onSurface: colors.ink,
+      surfaceVariant: colors.surfaceMuted,
+      onSurfaceVariant: colors.inkSoft,
+      outline: colors.outlineStrong,
+      outlineVariant: colors.outline,
+      shadow: colors.shadowStrong,
+      scrim: colors.scrim,
+      inverseSurface: colors.ink,
+      inverseOnSurface: colors.background,
+      inversePrimary: colors.secondary,
+      surfaceDisabled: colors.pressed,
+      onSurfaceDisabled: colors.muted,
+      backdrop: colors.scrim,
+      elevation: {
+        level0: colors.transparent,
+        level1: colors.surface,
+        level2: colors.surface,
+        level3: colors.surface,
+        level4: colors.surface,
+        level5: colors.surface,
+      },
+    },
+  };
+}
+
+type NavigationTheme = typeof NavigationDefaultTheme;
+
+function buildNavigationTheme(colors: Palette, scheme: ColorScheme): NavigationTheme {
+  const base = scheme === 'dark' ? NavigationDarkTheme : NavigationDefaultTheme;
+  return {
+    ...base,
+    dark: scheme === 'dark',
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.ink,
+      border: colors.outline,
+      notification: colors.primary,
+    },
+  };
+}
+
+/** Everything that changes with the theme. */
+export type AppTheme = {
+  scheme: ColorScheme;
+  colors: Palette;
+  elevation: Elevation;
+  /** Google Maps style JSON for this theme. */
+  mapStyle: MapStyleElement[];
+  /** expo-status-bar style for content drawn on `colors.background`. */
+  statusBarStyle: 'light' | 'dark';
+  paper: MD3Theme;
+  navigation: NavigationTheme;
+};
+
+export function buildTheme(scheme: ColorScheme): AppTheme {
+  const colors = scheme === 'dark' ? darkPalette : lightPalette;
+  return {
+    scheme,
+    colors,
+    elevation: buildElevation(colors),
+    mapStyle: scheme === 'dark' ? darkMapStyle : lightMapStyle,
+    statusBarStyle: scheme === 'dark' ? 'light' : 'dark',
+    paper: buildPaperTheme(colors, scheme),
+    navigation: buildNavigationTheme(colors, scheme),
+  };
+}
+
+/** Built once; switching themes swaps between these two objects. */
+export const THEMES: Record<ColorScheme, AppTheme> = {
+  light: buildTheme('light'),
+  dark: buildTheme('dark'),
 };

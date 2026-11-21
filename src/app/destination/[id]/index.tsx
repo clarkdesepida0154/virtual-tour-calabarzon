@@ -1,15 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import { IconButton } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
 import { BestScoreBadge, VisitedBadge } from '@/components/Badges';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -20,6 +19,7 @@ import { DetailsBodySkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag, ProvinceTag } from '@/components/Tag';
 import { MapPreview } from '@/components/map/MapPreview';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useUserLocation } from '@/context/LocationContext';
@@ -29,16 +29,21 @@ import { useDestinationProgress } from '@/hooks/useProgress';
 import { openDirections, shareDestination } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
-import { distanceFrom, formatDistance } from '@/lib/geo';
+import { distanceFrom } from '@/lib/geo';
 import { hasCoordinates } from '@/lib/mapRegion';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
-import { colors, elevation, iconSize, layout, radius, spacing } from '@/theme';
+import { iconSize, layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { Destination } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
 
 /** Distance over which the top bar fades in as the cover scrolls away. */
 const HEADER_FADE_DISTANCE = spacing.huge;
 
 export default function DestinationDetailsScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, errorMessage, distanceValue } = useI18n();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -105,12 +110,12 @@ export default function DestinationDetailsScreen() {
       setDeletedCopy(destination);
       setConfirmVisible(false);
       notifyChanged();
-      showToast(`“${destination.name}” was deleted.`);
+      showToast(t('details.deleted', { name: destination.name }));
       leave();
     } catch (cause) {
       setIsDeleting(false);
       setConfirmVisible(false);
-      showToast(toAppError(cause, 'We couldn’t delete the destination.').message);
+      showToast(errorMessage(toAppError(cause, 'deleteDestination')));
     }
   };
 
@@ -130,9 +135,9 @@ export default function DestinationDetailsScreen() {
         <BackBar onBack={leave} topInset={insets.top} />
         <EmptyState
           icon="map-marker-off-outline"
-          title="Destination not found"
-          message="This place is no longer in the collection. It may have been deleted."
-          actionLabel="Back to Explore"
+          title={t('details.notFound.title')}
+          message={t('details.notFound.message')}
+          actionLabel={t('details.notFound.action')}
           actionIcon="compass-outline"
           onAction={() => router.replace('/explore')}
           style={styles.centered}
@@ -147,13 +152,13 @@ export default function DestinationDetailsScreen() {
   const getDirections = async () => {
     if (!destination) return;
     const opened = await openDirections(destination);
-    if (!opened) showToast('We couldn’t open Google Maps on this device.');
+    if (!opened) showToast(t('details.directionsFailed'));
   };
 
   const share = async () => {
     if (!destination) return;
     const outcome = await shareDestination(destination);
-    if (outcome === 'unavailable') showToast('Sharing isn’t available on this device.');
+    if (outcome === 'unavailable') showToast(t('details.shareFailed'));
   };
   // Freely licensed photos must be credited; show the cover's credit if we have one.
   const coverCredit =
@@ -164,7 +169,7 @@ export default function DestinationDetailsScreen() {
 
   return (
     <View style={styles.screen}>
-      {isFocused ? <StatusBar style={isCollapsed ? 'dark' : 'light'} /> : null}
+      {isFocused ? <ThemedStatusBar overDark={!isCollapsed} /> : null}
 
       <Animated.ScrollView
         onScroll={handleScroll}
@@ -175,7 +180,7 @@ export default function DestinationDetailsScreen() {
         <View style={{ height: coverHeight }}>
           <CoverImage
             uri={destination?.cover_image_url}
-            label={destination ? `Photo of ${destination.name}` : 'Loading photo'}
+            label={destination ? t('common.photoOf', { name: destination.name }) : t('common.loadingPhoto')}
             fallbackIconSize="xxl"
             style={StyleSheet.absoluteFill}
           />
@@ -217,7 +222,7 @@ export default function DestinationDetailsScreen() {
                   <AppText
                     variant="bodyStrong"
                     style={styles.flex}
-                    accessibilityLabel={`Address: ${destination.address}`}>
+                    accessibilityLabel={t('details.addressA11y', { address: destination.address })}>
                     {destination.address}
                   </AppText>
                 </View>
@@ -228,8 +233,8 @@ export default function DestinationDetailsScreen() {
                       variant="label"
                       color="secondaryDark"
                       style={styles.flex}
-                      accessibilityLabel={`${formatDistance(km)} in a straight line from where you are`}>
-                      {formatDistance(km)} · straight-line distance
+                      accessibilityLabel={t('nearMe.straightLineA11y', { distance: distanceValue(km) })}>
+                      {t('nearMe.straightLine', { distance: distanceValue(km) })}
                     </AppText>
                   </View>
                 ) : null}
@@ -240,7 +245,7 @@ export default function DestinationDetailsScreen() {
                       variant="label"
                       color="inkSoft"
                       style={styles.flex}
-                      accessibilityLabel={`Coordinates: ${coordinates}`}>
+                      accessibilityLabel={t('details.coordinatesA11y', { coordinates })}>
                       {coordinates}
                     </AppText>
                   </View>
@@ -249,11 +254,11 @@ export default function DestinationDetailsScreen() {
 
               {hasCoordinates(destination) ? (
                 <AppButton
-                  label="Get directions"
+                  label={t('details.getDirections')}
                   icon="directions"
                   variant="secondary"
                   onPress={() => void getDirections()}
-                  accessibilityHint="Opens Google Maps with directions from where you are"
+                  accessibilityHint={t('details.directionsHint')}
                   style={styles.directions}
                 />
               ) : null}
@@ -278,20 +283,20 @@ export default function DestinationDetailsScreen() {
                     })
                   }
                   accessibilityRole="button"
-                  accessibilityLabel={`Show ${destination.name} on the map`}
+                  accessibilityLabel={t('details.showOnMap', { name: destination.name })}
                   style={({ pressed }) => [styles.mapCard, pressed && styles.pressed]}>
                   <View style={styles.mapFrame}>
                     <MapPreview
                       latitude={destination.latitude}
                       longitude={destination.longitude}
                       pinColor={colors[CATEGORY_META[destination.category].color]}
-                      label={`Map showing where ${destination.name} is`}
+                      label={t('details.mapA11y', { name: destination.name })}
                     />
                   </View>
                   <View style={styles.mapFooter}>
                     <AppIcon name="map-marker-radius-outline" size="sm" color="primary" />
                     <AppText variant="label" color="ink" style={styles.flex}>
-                      View on the map
+                      {t('details.viewOnMap')}
                     </AppText>
                     <AppIcon name="arrow-right" size="sm" color="primary" />
                   </View>
@@ -301,14 +306,14 @@ export default function DestinationDetailsScreen() {
               {destination.history ? (
                 <StorySection
                   icon="book-open-page-variant-outline"
-                  title="History"
+                  title={t('details.history')}
                   body={destination.history}
                 />
               ) : null}
               {destination.cultural_significance ? (
                 <StorySection
                   icon="drama-masks"
-                  title="Cultural Significance"
+                  title={t('details.culture')}
                   body={destination.cultural_significance}
                 />
               ) : null}
@@ -325,11 +330,11 @@ export default function DestinationDetailsScreen() {
               {/* Collection management (Phase 1 CRUD) */}
               <View style={styles.manage}>
                 <AppText variant="overline" color="muted">
-                  Manage this entry
+                  {t('details.manage')}
                 </AppText>
                 <View style={styles.manageRow}>
                   <AppButton
-                    label="Edit"
+                    label={t('common.edit')}
                     icon="pencil-outline"
                     variant="secondary"
                     onPress={() =>
@@ -337,16 +342,16 @@ export default function DestinationDetailsScreen() {
                     }
                     disabled={isDeleting}
                     style={styles.flex}
-                    accessibilityHint="Opens the edit form"
+                    accessibilityHint={t('details.editHint')}
                   />
                   <AppButton
-                    label="Delete"
+                    label={t('common.delete')}
                     icon="trash-can-outline"
                     variant="danger"
                     onPress={() => setConfirmVisible(true)}
                     disabled={isDeleting}
                     style={styles.flex}
-                    accessibilityHint="Asks for confirmation first"
+                    accessibilityHint={t('details.deleteHint')}
                   />
                 </View>
               </View>
@@ -360,14 +365,14 @@ export default function DestinationDetailsScreen() {
       {/* Top bar: back button, plus the name once the photo has scrolled away */}
       <View style={[styles.topBar, { height: topBarHeight, paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[styles.topBarFill, { opacity: headerOpacity }]} pointerEvents="none" />
-        <IconButton
+        <AppIconButton
           icon="arrow-left"
           mode="contained"
           size={iconSize.md}
           containerColor={colors.surface}
           iconColor={colors.ink}
           onPress={leave}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           style={styles.roundButton}
         />
         <Animated.View style={[styles.topBarTitle, { opacity: headerOpacity }]} pointerEvents="none">
@@ -382,14 +387,14 @@ export default function DestinationDetailsScreen() {
               name={destination.name}
               style={styles.roundButton}
             />
-            <IconButton
+            <AppIconButton
               icon="share-variant-outline"
               mode="contained"
               size={iconSize.md}
               containerColor={colors.surface}
               iconColor={colors.ink}
               onPress={() => void share()}
-              accessibilityLabel={`Share ${destination.name}`}
+              accessibilityLabel={t('details.share', { name: destination.name })}
               style={styles.roundButton}
             />
           </View>
@@ -400,17 +405,21 @@ export default function DestinationDetailsScreen() {
       {destination ? (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + spacing.md }]}>
           <AppButton
-            label="Start Virtual Tour"
+            label={t('details.startTour')}
             icon="walk"
             onPress={() =>
               router.push({ pathname: '/destination/[id]/tour', params: { id: destination.id } })
             }
             disabled={isDeleting}
             style={styles.tourButton}
-            accessibilityHint="Opens a guided, full-screen tour with photos, history and culture"
+            accessibilityHint={t('details.startTourHint')}
           />
           <AppButton
-            label={progress.data?.best ? `Quiz · ${progress.data.best.score}/${progress.data.best.total}` : 'Quiz'}
+            label={
+              progress.data?.best
+                ? t('details.quizBest', { score: progress.data.best.score, total: progress.data.best.total })
+                : t('details.quiz')
+            }
             icon="help-circle-outline"
             variant="secondary"
             onPress={() =>
@@ -418,20 +427,18 @@ export default function DestinationDetailsScreen() {
             }
             disabled={isDeleting}
             style={styles.flex}
-            accessibilityHint="Five multiple-choice questions about this destination"
+            accessibilityHint={t('details.quizHint')}
           />
         </View>
       ) : null}
 
       <ConfirmDialog
         visible={confirmVisible}
-        title="Delete this destination?"
+        title={t('details.deleteDialog.title')}
         message={
-          destination
-            ? `“${destination.name}” will be removed from the collection for everyone. This can’t be undone.`
-            : ''
+          destination ? t('details.deleteDialog.message', { name: destination.name }) : ''
         }
-        confirmLabel="Delete"
+        confirmLabel={t('common.delete')}
         destructive
         busy={isDeleting}
         onConfirm={handleDelete}
@@ -443,41 +450,46 @@ export default function DestinationDetailsScreen() {
 
 /** A framed invitation to the guided tour, inside the page. */
 function TourInvite({ visited, onStart }: { visited: boolean; onStart: () => void }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
     <Pressable
       onPress={onStart}
       accessibilityRole="button"
-      accessibilityLabel={visited ? 'Take the virtual tour again' : 'Start the virtual tour'}
+      accessibilityLabel={t(visited ? 'details.invite.again' : 'details.invite.start')}
       style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
       <View style={styles.inviteIcon}>
         <AppIcon name="bank-outline" size="lg" color="secondary" />
       </View>
       <View style={styles.flex}>
         <AppText variant="overline" color="secondary">
-          {visited ? 'Visited · tour again' : 'Virtual tour'}
+          {t(visited ? 'details.invite.overlineVisited' : 'details.invite.overline')}
         </AppText>
-        <AppText variant="cardTitleSmall" color="onPrimary">
-          Step inside the exhibit
+        <AppText variant="cardTitleSmall" color="onPhoto">
+          {t('details.invite.title')}
         </AppText>
-        <AppText variant="caption" color="onPrimaryMuted">
-          Gallery, history and cultural significance — one chapter at a time.
+        <AppText variant="caption" color="onPhotoMuted">
+          {t('details.invite.body')}
         </AppText>
       </View>
-      <AppIcon name="chevron-right" size="md" color="onPrimary" />
+      <AppIcon name="chevron-right" size="md" color="onPhoto" />
     </Pressable>
   );
 }
 
 /** Minimal header for the error / not-found states. */
 function BackBar({ onBack, topInset }: { onBack: () => void; topInset: number }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   return (
     <View style={[styles.backBar, { paddingTop: topInset }]}>
-      <IconButton
+      <AppIconButton
         icon="arrow-left"
         size={iconSize.md}
         iconColor={colors.ink}
         onPress={onBack}
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBack')}
       />
     </View>
   );
@@ -491,6 +503,7 @@ type StorySectionProps = {
 
 /** A titled card for the longer "virtual tour" texts. */
 function StorySection({ icon, title, body }: StorySectionProps) {
+  const styles = useStyles();
   return (
     <View style={styles.story}>
       <View style={styles.storyHeader}>
@@ -508,7 +521,7 @@ function StorySection({ icon, title, body }: StorySectionProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -680,4 +693,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.outline,
     ...elevation.bar,
   },
-});
+}));

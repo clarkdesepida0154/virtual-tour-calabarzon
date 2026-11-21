@@ -71,7 +71,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     if (search) query = query.or(search);
 
     const { data, error } = await query.order('name', { ascending: true });
-    if (error) throw toAppError(error, 'We couldn’t load the destinations.');
+    if (error) throw toAppError(error, 'loadDestinations');
     return data;
   }
 
@@ -83,7 +83,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .order('name', { ascending: true });
-    if (error) throw toAppError(error, 'We couldn’t load the map.');
+    if (error) throw toAppError(error, 'loadMap');
     return data.filter(
       (row): row is DestinationPin => row.latitude !== null && row.longitude !== null,
     );
@@ -94,14 +94,14 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
     const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
     if (error) {
       if (error.code === INVALID_INPUT_SYNTAX) return null;
-      throw toAppError(error, 'We couldn’t load this destination.');
+      throw toAppError(error, 'loadDestination');
     }
     return data;
   }
 
   async function create(input: DestinationInsert): Promise<Destination> {
     const { data, error } = await client.from(TABLE).insert(input).select().single();
-    if (error) throw toAppError(error, 'We couldn’t save the destination.');
+    if (error) throw toAppError(error, 'saveDestination');
     return data;
   }
 
@@ -112,9 +112,9 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
       .eq('id', id)
       .select()
       .maybeSingle();
-    if (error) throw toAppError(error, 'We couldn’t save your changes.');
+    if (error) throw toAppError(error, 'saveChanges');
     if (!data) {
-      throw new AppError('not-found', 'This destination no longer exists, so it can’t be edited.');
+      throw new AppError('not-found', 'errors.context.destinationGone');
     }
     return data;
   }
@@ -122,7 +122,7 @@ export function createDestinationsRepository(client: SupabaseClient<Database>) {
   /** Deletes the destination; its photos, quiz and progress rows cascade. */
   async function remove(id: string): Promise<void> {
     const { error } = await client.from(TABLE).delete().eq('id', id);
-    if (error) throw toAppError(error, 'We couldn’t delete the destination.');
+    if (error) throw toAppError(error, 'deleteDestination');
   }
 
   return { list, listPins, getById, create, update, remove };

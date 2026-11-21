@@ -1,8 +1,9 @@
-import { StyleSheet } from 'react-native';
 import { Button, Dialog, Portal } from 'react-native-paper';
 
 import { AppText } from '@/components/AppText';
-import { colors, radius, typography } from '@/theme';
+import { radius, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type Props = {
   visible: boolean;
@@ -24,12 +25,15 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  cancelLabel = 'Cancel',
+  cancelLabel,
   destructive = false,
   busy = false,
   onConfirm,
   onCancel,
 }: Props) {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const { colors } = useAppTheme();
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onCancel} dismissable={!busy} style={styles.dialog}>
@@ -41,7 +45,7 @@ export function ConfirmDialog({
         </Dialog.Content>
         <Dialog.Actions>
           <Button onPress={onCancel} disabled={busy} textColor={colors.inkSoft} labelStyle={styles.label}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </Button>
           <Button
             onPress={onConfirm}
@@ -57,7 +61,7 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   dialog: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -69,4 +73,4 @@ const styles = StyleSheet.create({
   label: {
     ...typography.button,
   },
-});
+}));

@@ -47,7 +47,7 @@ export function createDestinationImagesRepository(client: SupabaseClient<Databas
       cacheControl: CACHE_SECONDS,
       upsert: false,
     });
-    if (error) throw toAppError(error, 'We couldn’t upload the photo.');
+    if (error) throw toAppError(error, 'uploadPhoto');
     return bucket().getPublicUrl(path).data.publicUrl;
   }
 
@@ -82,7 +82,18 @@ export function createDestinationImagesRepository(client: SupabaseClient<Databas
       .select('*')
       .eq('destination_id', destinationId)
       .order('sort_order', { ascending: true });
-    if (error) throw toAppError(error, 'We couldn’t load the photos.');
+    if (error) throw toAppError(error, 'loadPhotos');
+    return data;
+  }
+
+  /** Every photo row of every destination (for the Photo Credits screen). */
+  async function listAll(): Promise<DestinationImage[]> {
+    const { data, error } = await client
+      .from(TABLE)
+      .select('*')
+      .order('destination_id', { ascending: true })
+      .order('sort_order', { ascending: true });
+    if (error) throw toAppError(error, 'loadCredits');
     return data;
   }
 
@@ -104,6 +115,7 @@ export function createDestinationImagesRepository(client: SupabaseClient<Databas
     removeByPublicUrl,
     removeFilesByPublicUrl,
     listForDestination,
+    listAll,
     removeRecordByUrl,
   };
 }

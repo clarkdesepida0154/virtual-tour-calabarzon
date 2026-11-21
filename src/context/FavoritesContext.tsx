@@ -1,11 +1,11 @@
 import { createContext, use, useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useI18n } from '@/context/I18nContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { tapFeedback } from '@/lib/device';
-import { toAppError } from '@/lib/errors';
 import { mergeFavoriteChanges } from '@/lib/favorites';
 import type { FavoriteChange, FavoriteEntry } from '@/lib/favorites';
 import { favoritesRepository } from '@/repositories';
@@ -35,6 +35,7 @@ type Pending = { userKey: string; changes: Map<string, FavoriteChange> };
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { userKey, isReady: identityReady } = useIdentity();
   const { showToast } = useToast();
+  const { t } = useI18n();
   const query = useAsyncData(
     `favorites:${userKey}`,
     () => (userKey ? favoritesRepository.list(userKey) : Promise.resolve([])),
@@ -64,7 +65,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   );
 
   const toggle = useCallback(
-    (destinationId: string, name?: string) => {
+    (destinationId: string, name = '') => {
       if (!userKey) return;
       const key = userKey;
       const on = !ids.has(destinationId);
@@ -72,17 +73,14 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
       setChange(key, destinationId, { on, at: new Date().toISOString() });
       favoritesRepository.set(key, destinationId, on).then(
         () => reload(),
-        (cause: unknown) => {
+        () => {
           // Put the heart back the way it was, and say why.
           setChange(key, destinationId, null);
-          const action = on ? 'save' : 'remove';
-          showToast(
-            toAppError(cause, `We couldn’t ${action} ${name ? `“${name}”` : 'this favorite'}.`).message,
-          );
+          showToast(t(on ? 'favorites.saveFailed' : 'favorites.removeFailed', { name }));
         },
       );
     },
-    [userKey, ids, setChange, reload, showToast],
+    [userKey, ids, setChange, reload, showToast, t],
   );
 
   const value = useMemo<FavoritesValue>(

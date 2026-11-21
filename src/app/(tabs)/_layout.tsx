@@ -3,7 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
-import { colors, layout, spacing, typography } from '@/theme';
+import { layout, spacing, typography } from '@/theme';
+import { useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 /** Filled terracotta icon for the active tab, muted outline for the others. */
 function tabIcon(active: IconName, inactive: IconName) {
@@ -19,6 +21,8 @@ function tabIcon(active: IconName, inactive: IconName) {
 }
 
 export default function TabsLayout() {
+  const { t } = useI18n();
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -41,28 +45,28 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: tabIcon('home-variant', 'home-variant-outline'),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          title: t('tabs.explore'),
           tabBarIcon: tabIcon('compass', 'compass-outline'),
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
-          title: 'Map',
+          title: t('tabs.map'),
           tabBarIcon: tabIcon('map-marker-radius', 'map-marker-radius-outline'),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'Progress',
+          title: t('tabs.progress'),
           tabBarIcon: tabIcon('medal', 'medal-outline'),
         }}
       />

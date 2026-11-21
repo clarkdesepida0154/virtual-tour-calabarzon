@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { DestinationCardSkeleton } from '@/components/Skeleton';
@@ -7,9 +7,13 @@ import { EmptyState, ErrorState } from '@/components/StateViews';
 import { DestinationForm } from '@/components/form/DestinationForm';
 import { useToast } from '@/context/ToastContext';
 import { useDestination } from '@/hooks/useDestinations';
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 export default function EditDestinationScreen() {
+  const styles = useStyles();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -25,7 +29,7 @@ export default function EditDestinationScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader overline="Editing" title="Edit Destination" onBack={leave} divider />
+      <ScreenHeader overline={t('form.editOverline')} title={t('form.editTitle')} onBack={leave} divider />
 
       {destination ? (
         <DestinationForm
@@ -33,7 +37,7 @@ export default function EditDestinationScreen() {
           destination={destination}
           onCancel={leave}
           onSaved={() => {
-            showToast('Your changes were saved.');
+            showToast(t('form.savedChanges'));
             leave();
           }}
         />
@@ -42,15 +46,15 @@ export default function EditDestinationScreen() {
       ) : query.status === 'success' ? (
         <EmptyState
           icon="map-marker-off-outline"
-          title="Destination not found"
-          message="This place is no longer in the collection, so it can’t be edited."
-          actionLabel="Back to Explore"
+          title={t('details.notFound.title')}
+          message={t('form.editNotFound')}
+          actionLabel={t('details.notFound.action')}
           actionIcon="compass-outline"
           onAction={() => router.replace('/explore')}
           style={styles.state}
         />
       ) : (
-        <View style={styles.loading} accessibilityLabel="Loading destination">
+        <View style={styles.loading} accessibilityLabel={t('form.loadingA11y')}>
           <DestinationCardSkeleton />
           <DestinationCardSkeleton />
         </View>
@@ -59,7 +63,7 @@ export default function EditDestinationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -71,4 +75,4 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
-});
+}));

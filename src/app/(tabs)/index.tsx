@@ -1,10 +1,10 @@
 import { useIsFocused, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/AppIcon';
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
 import { FeaturedCard } from '@/components/DestinationCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -12,22 +12,25 @@ import { SearchField } from '@/components/SearchField';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FeaturedCardSkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import {
   CATEGORIES,
   CATEGORY_META,
   PROVINCES,
-  PROVINCE_META,
-  REGION_LABEL,
 } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
 import { useExploreFilters } from '@/context/ExploreFiltersContext';
 import type { ExploreFilters } from '@/context/ExploreFiltersContext';
 import { useHomeData } from '@/hooks/useDestinations';
-import { pluralize } from '@/lib/format';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing, iconSize } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { DestinationSummary } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
 
 export default function HomeScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -54,7 +57,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      {isFocused ? <StatusBar style="light" /> : null}
+      {isFocused ? <ThemedStatusBar overDark /> : null}
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -65,7 +68,7 @@ export default function HomeScreen() {
             refreshing={home.isRefreshing}
             onRefresh={home.refresh}
             colors={[colors.primary]}
-            tintColor={colors.onPrimary}
+            tintColor={colors.onPhoto}
             progressBackgroundColor={colors.surface}
             progressViewOffset={insets.top}
           />
@@ -73,18 +76,29 @@ export default function HomeScreen() {
         {/* Hero: app name and tagline */}
         <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
           <View style={styles.watermark} pointerEvents="none">
-            <AppIcon name="compass-rose" size="watermark" color="primaryDark" />
+            <AppIcon name="compass-rose" size="watermark" color="heroWatermark" />
           </View>
-          <AppText variant="overline" color="secondary">
-            {REGION_LABEL}
-          </AppText>
-          <AppText variant="hero" color="onPrimary" accessibilityRole="header">
-            Virtual Tour &{'\n'}Cultural Mapping
+          <View style={styles.heroTop}>
+            <AppText variant="overline" color="heroAccent" style={styles.flex}>
+              {t('common.region')}
+            </AppText>
+            <AppIconButton
+              icon="cog-outline"
+              mode="contained"
+              size={iconSize.md}
+              containerColor={colors.glass}
+              iconColor={colors.onPhoto}
+              onPress={() => router.push('/settings')}
+              accessibilityLabel={t('settings.openA11y')}
+              style={styles.gear}
+            />
+          </View>
+          <AppText variant="hero" color="onPhoto" accessibilityRole="header">
+            {t('home.heroTitle')}
           </AppText>
           <View style={styles.heroRule} />
-          <AppText variant="tagline" color="onPrimaryMuted">
-            Step inside the shrines, churches and natural wonders of Southern Tagalog — a field
-            trip in your pocket.
+          <AppText variant="tagline" color="onPhotoMuted">
+            {t('home.tagline')}
           </AppText>
         </View>
 
@@ -94,7 +108,7 @@ export default function HomeScreen() {
             value={query}
             onChangeText={setQuery}
             onSubmit={submitSearch}
-            placeholder="Search destinations or towns"
+            placeholder={t('home.searchPlaceholder')}
           />
         </View>
 
@@ -103,13 +117,13 @@ export default function HomeScreen() {
         {/* Featured carousel */}
         <View style={styles.section}>
           <SectionHeader
-            title="Featured"
-            subtitle="Start your tour with these landmarks."
-            actionLabel="See all"
+            title={t('home.featured.title')}
+            subtitle={t('home.featured.subtitle')}
+            actionLabel={t('common.seeAll')}
             onAction={() => openExplore()}
           />
           {home.status === 'loading' ? (
-            <View style={styles.carousel} accessibilityLabel="Loading featured destinations">
+            <View style={styles.carousel} accessibilityLabel={t('home.featured.loadingA11y')}>
               <FeaturedCardSkeleton />
               <FeaturedCardSkeleton />
             </View>
@@ -118,9 +132,9 @@ export default function HomeScreen() {
           ) : featured.length === 0 ? (
             <EmptyState
               icon="map-search-outline"
-              title="No destinations yet"
-              message="The collection is empty. Add the first place worth visiting in CALABARZON."
-              actionLabel="Add a destination"
+              title={t('home.empty.title')}
+              message={t('home.empty.message')}
+              actionLabel={t('home.empty.action')}
               actionIcon="plus"
               onAction={() => router.push('/add')}
             />
@@ -141,8 +155,8 @@ export default function HomeScreen() {
         {/* Category grid */}
         <View style={styles.section}>
           <SectionHeader
-            title="Browse by Category"
-            subtitle="Pick the kind of place you want to see."
+            title={t('home.categories.title')}
+            subtitle={t('home.categories.subtitle')}
           />
           <View style={styles.grid}>
             {CATEGORIES.map((category, index) => (
@@ -161,8 +175,8 @@ export default function HomeScreen() {
         {/* Province shortcuts */}
         <View style={styles.section}>
           <SectionHeader
-            title="Explore by Province"
-            subtitle="Five provinces, one region."
+            title={t('home.provinces.title')}
+            subtitle={t('home.provinces.subtitle')}
           />
           <View style={styles.directory}>
             {PROVINCES.map((province, index) => (
@@ -200,15 +214,19 @@ type CategoryTileProps = {
 };
 
 function CategoryTile({ category, count, wide, onPress }: CategoryTileProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, categoryLabel } = useI18n();
   const meta = CATEGORY_META[category];
-  const countLabel = count === undefined ? meta.blurb : pluralize(count, 'place');
+  const label = categoryLabel(category);
+  const countLabel = count === undefined ? categoryLabel(category, 'blurb') : t('home.categories.count', { count });
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${category}, ${countLabel}`}
-      accessibilityHint="Shows this category in Explore"
+      accessibilityLabel={`${label}, ${countLabel}`}
+      accessibilityHint={t('home.categories.hint')}
       android_ripple={{ color: colors.pressed }}
       style={({ pressed }) => [styles.tile, wide && styles.tileWide, pressed && styles.pressed]}>
       <View style={styles.tileIcon}>
@@ -216,7 +234,7 @@ function CategoryTile({ category, count, wide, onPress }: CategoryTileProps) {
       </View>
       <View style={wide ? styles.flex : undefined}>
         <AppText variant="subtitle" numberOfLines={2}>
-          {category}
+          {label}
         </AppText>
         <AppText variant="caption" color="inkSoft" numberOfLines={1}>
           {countLabel}
@@ -234,14 +252,17 @@ type ProvinceRowProps = {
 };
 
 function ProvinceRow({ province, count, showDivider, onPress }: ProvinceRowProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, provinceTagline } = useI18n();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={
-        count === undefined ? province : `${province}, ${pluralize(count, 'destination')}`
+        count === undefined ? province : `${province}, ${t('explore.count', { count })}`
       }
-      accessibilityHint="Shows this province in Explore"
+      accessibilityHint={t('home.provinces.hint')}
       android_ripple={{ color: colors.pressed }}
       style={({ pressed }) => [
         styles.directoryRow,
@@ -256,7 +277,7 @@ function ProvinceRow({ province, count, showDivider, onPress }: ProvinceRowProps
       <View style={styles.flex}>
         <AppText variant="subtitle">{province}</AppText>
         <AppText variant="caption" color="inkSoft" numberOfLines={2}>
-          {PROVINCE_META[province].tagline}
+          {provinceTagline(province)}
         </AppText>
       </View>
       {count === undefined ? null : (
@@ -271,7 +292,7 @@ function ProvinceRow({ province, count, showDivider, onPress }: ProvinceRowProps
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   offline: {
     marginHorizontal: spacing.xl,
     marginTop: spacing.lg,
@@ -291,10 +312,18 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.heroBackground,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  gear: {
+    margin: 0,
   },
   hero: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.heroBackground,
     paddingHorizontal: spacing.xl,
     paddingBottom: layout.searchBarHeight / 2 + spacing.xl,
     borderBottomLeftRadius: radius.xl,
@@ -401,4 +430,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxl,
     paddingHorizontal: spacing.xl,
   },
-});
+}));

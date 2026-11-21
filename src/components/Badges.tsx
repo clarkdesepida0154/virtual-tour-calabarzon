@@ -1,11 +1,13 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { ColorToken } from '@/theme';
+import { useI18n } from '@/context/I18nContext';
 
 type Tone = 'success' | 'gold' | 'primary' | 'neutral';
 
@@ -26,6 +28,8 @@ type BadgeProps = {
 
 /** A small status pill: "Visited", "Best 4/5", and so on. */
 export function Badge({ icon, label, tone = 'neutral', accessibilityLabel, style }: BadgeProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const { background, foreground } = TONES[tone];
   return (
     <View
@@ -41,7 +45,8 @@ export function Badge({ icon, label, tone = 'neutral', accessibilityLabel, style
 }
 
 export function VisitedBadge({ style }: { style?: StyleProp<ViewStyle> }) {
-  return <Badge icon="check-decagram" label="Visited" tone="success" style={style} />;
+  const { t } = useI18n();
+  return <Badge icon="check-decagram" label={t('badges.visited')} tone="success" style={style} />;
 }
 
 export function BestScoreBadge({
@@ -53,12 +58,13 @@ export function BestScoreBadge({
   total: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { t } = useI18n();
   return (
     <Badge
       icon="trophy-outline"
-      label={`Best ${score}/${total}`}
+      label={t('badges.best', { score, total })}
       tone="gold"
-      accessibilityLabel={`Best quiz score ${score} out of ${total}`}
+      accessibilityLabel={t('badges.bestA11y', { score, total })}
       style={style}
     />
   );
@@ -73,6 +79,8 @@ type MeterProps = {
 
 /** A slim horizontal bar, for per-province completion. */
 export function Meter({ value, color = 'success', accessibilityLabel }: MeterProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const clamped = Math.min(1, Math.max(0, value));
   return (
     <View
@@ -95,14 +103,17 @@ type PageDotsProps = {
 
 /** Gallery position indicator: the active dot stretches into a pill. */
 export function PageDots({ count, index, tone = 'light' }: PageDotsProps) {
+  const { t } = useI18n();
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   if (count <= 1) return null;
-  const active: ColorToken = tone === 'light' ? 'onPrimary' : 'primary';
+  const active: ColorToken = tone === 'light' ? 'onPhoto' : 'primary';
   const idle: ColorToken = tone === 'light' ? 'onExhibitFaint' : 'outlineStrong';
   return (
     <View
       style={styles.dots}
       accessible
-      accessibilityLabel={`Photo ${index + 1} of ${count}`}>
+      accessibilityLabel={t('badges.photoOf', { index: index + 1, count })}>
       {Array.from({ length: count }, (_, dot) => (
         <View
           key={dot}
@@ -117,7 +128,7 @@ export function PageDots({ count, index, tone = 'light' }: PageDotsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -150,4 +161,4 @@ const styles = StyleSheet.create({
   dotActive: {
     width: layout.pageDotActive,
   },
-});
+}));

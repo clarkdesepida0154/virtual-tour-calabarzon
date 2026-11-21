@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
 
 type Props = {
   title: string;
@@ -15,6 +16,7 @@ type Props = {
 
 /** Serif section title with a short gold rule, and an optional "See all". */
 export function SectionHeader({ title, subtitle, actionLabel, onAction, inset = true }: Props) {
+  const styles = useStyles();
   return (
     <View style={[styles.container, !inset && styles.flush]}>
       <View style={styles.text}>
@@ -45,7 +47,7 @@ export function SectionHeader({ title, subtitle, actionLabel, onAction, inset = 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -75,4 +77,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: layout.pressedOpacity,
   },
-});
+}));

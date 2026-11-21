@@ -31,6 +31,7 @@ import {
 import { buildSearchFilter, createDestinationsRepository } from '../src/repositories/destinations.ts';
 import { createFavoritesRepository } from '../src/repositories/favorites.ts';
 import { createProgressRepository } from '../src/repositories/progress.ts';
+import { countCredits, groupCredits } from '../src/lib/credits.ts';
 import { favoriteDestinations } from '../src/lib/favorites.ts';
 import { distanceFrom, sortByDistance } from '../src/lib/geo.ts';
 import { createQuizRepository } from '../src/repositories/quiz.ts';
@@ -152,6 +153,16 @@ async function main() {
     expect(sameList(names(all), sorted), 'not sorted by name');
     expect(!('history' in all[0]) && !('description' in all[0]), 'list rows should not carry the long texts');
     expect(all.every((row) => row.id && row.name && row.province && row.category), 'summary fields missing');
+  });
+
+  await check('Photo Credits: listAll() returns all 78 credited photos, grouped under 26 destinations', async () => {
+    const rows = await images.listAll();
+    expect(rows.length >= expected.length * 3, `only ${rows.length} photo rows`);
+    expect(rows.every((row) => CREDIT_PATTERN.test(row.caption ?? '')), 'a photo row lacks a proper credit line');
+    const groups = groupCredits(all, rows);
+    expect(groups.length >= expected.length, `${groups.length} credit groups`);
+    expect(countCredits(groups) === rows.length, 'credits lost while grouping');
+    expect(groups.every((group) => group.credits[0].position === 0), 'cover not first');
   });
 
   await check('summaries carry coordinates for Near me; nearest-first sort from Calamba works', async () => {

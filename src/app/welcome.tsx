@@ -1,16 +1,17 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppText } from '@/components/AppText';
-import { REGION_LABEL } from '@/constants/taxonomy';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { useIdentity } from '@/context/IdentityContext';
-import { colors, elevation, layout, motion, radius, spacing } from '@/theme';
+import { layout, motion, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 /** Bundled so Welcome looks right even offline. Same file as the dataset's Taal cover. */
 const WELCOME_PHOTO = require('../../assets/images/welcome.jpg');
@@ -19,10 +20,13 @@ const EMBLEM = require('../../assets/images/splash-icon.png');
 
 /** First screen without a session: sign in, create an account, or continue as a guest. */
 export default function WelcomeScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { continueAsGuest } = useIdentity();
+  const { t } = useI18n();
   const [isEntering, setIsEntering] = useState(false);
 
   const photoHeight = Math.max(layout.detailCoverMinHeight, height * layout.welcomePhotoRatio);
@@ -35,7 +39,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="light" />
+      <ThemedStatusBar overDark />
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={false}
@@ -46,7 +50,7 @@ export default function WelcomeScreen() {
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={motion.normal}
-            accessibilityLabel="The stone façade of the Basilica of St. Martin de Tours in Taal, Batangas"
+            accessibilityLabel={t('welcome.photoA11y')}
           />
           <LinearGradient
             colors={[colors.photoShadeSoft, colors.photoShadeNone]}
@@ -65,48 +69,46 @@ export default function WelcomeScreen() {
           </View>
 
           <AppText variant="overline" color="secondaryDark" align="center">
-            {REGION_LABEL}
+            {t('common.region')}
           </AppText>
           <AppText variant="hero" align="center" accessibilityRole="header">
-            Virtual Tour &amp; Cultural Mapping
+            {t('common.appName')}
           </AppText>
           <View style={styles.rule} />
           <AppText variant="tagline" color="inkSoft" align="center" style={styles.tagline}>
-            Walk through the shrines, churches, falls and heritage towns of five provinces — no
-            field trip required.
+            {t('welcome.tagline')}
           </AppText>
 
           <View style={styles.actions}>
             <AppButton
-              label="Create an account"
+              label={t('welcome.createAccount')}
               icon="account-plus-outline"
               onPress={() => router.push('/sign-up')}
               disabled={isEntering}
             />
             <AppButton
-              label="Sign in"
+              label={t('welcome.signIn')}
               icon="login"
               variant="secondary"
               onPress={() => router.push('/sign-in')}
               disabled={isEntering}
             />
             <AppButton
-              label="Continue as guest"
+              label={t('welcome.continueAsGuest')}
               icon="arrow-right"
               variant="text"
               onPress={enterAsGuest}
               loading={isEntering}
-              accessibilityHint="Opens the app without an account. Every feature is available."
+              accessibilityHint={t('welcome.guestHint')}
             />
           </View>
 
           <AppText variant="caption" color="muted" align="center">
-            Guests can use every feature. An account keeps your tours and quiz scores with your
-            email, so you can sign in on another phone.
+            {t('welcome.guestNote')}
           </AppText>
 
           <AppText variant="caption" color="muted" align="center" style={styles.credit}>
-            Cover: Basilica of St. Martin de Tours, Taal. {WELCOME_PHOTO_CREDIT}
+            {t('welcome.cover')} {WELCOME_PHOTO_CREDIT}
           </AppText>
         </View>
       </ScrollView>
@@ -114,7 +116,7 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -168,4 +170,4 @@ const styles = StyleSheet.create({
   credit: {
     marginTop: spacing.lg,
   },
-});
+}));

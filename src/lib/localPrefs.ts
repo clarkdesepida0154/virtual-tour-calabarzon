@@ -75,3 +75,26 @@ export const writeOnboardingSeen = (seen: boolean) => writeFlag(ONBOARDING_SEEN_
 export const readLocationPromptDismissed = () => readFlag(LOCATION_PROMPT_DISMISSED_KEY);
 export const writeLocationPromptDismissed = (dismissed: boolean) =>
   writeFlag(LOCATION_PROMPT_DISMISSED_KEY, dismissed);
+
+// ---------------------------------------------------------------------------
+// Run 5: settings (theme, language, narration) — one JSON value
+// ---------------------------------------------------------------------------
+
+const PREFERENCES_KEY = 'vtour.preferences';
+
+/** The raw stored settings, or null (parse with `parsePreferences`). */
+export async function readPreferencesRaw(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(PREFERENCES_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function writePreferencesRaw(value: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PREFERENCES_KEY, value);
+  } catch {
+    // Not fatal: the choice still applies until the app is closed.
+  }
+}

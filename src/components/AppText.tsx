@@ -1,7 +1,8 @@
 import { Text } from 'react-native';
 import type { TextProps } from 'react-native';
 
-import { colors, maxFontScale, typography } from '@/theme';
+import { maxFontScale, typography } from '@/theme';
+import { useAppTheme } from '@/theme/ThemeProvider';
 import type { ColorToken, TypographyToken } from '@/theme';
 
 type Props = TextProps & {
@@ -15,6 +16,7 @@ type Props = TextProps & {
  * Keeps font families, sizes and colours out of screen code.
  */
 export function AppText({ variant = 'body', color = 'ink', align, style, ...rest }: Props) {
+  const { colors } = useAppTheme();
   return (
     <Text
       maxFontSizeMultiplier={maxFontScale}

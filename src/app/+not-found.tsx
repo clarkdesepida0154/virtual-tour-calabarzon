@@ -1,19 +1,22 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyState } from '@/components/StateViews';
-import { colors } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 export default function NotFoundScreen() {
+  const { t } = useI18n();
+  const styles = useStyles();
   const router = useRouter();
 
   return (
     <View style={styles.screen}>
       <EmptyState
         icon="compass-off-outline"
-        title="Page not found"
-        message="That screen doesn’t exist. Let’s get you back to the tour."
-        actionLabel="Go to Home"
+        title={t('notFound.title')}
+        message={t('notFound.message')}
+        actionLabel={t('notFound.action')}
         actionIcon="home-variant-outline"
         onAction={() => router.replace('/')}
       />
@@ -21,10 +24,10 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
     justifyContent: 'center',
     backgroundColor: colors.background,
   },
-});
+}));

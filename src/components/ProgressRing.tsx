@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-import { colors, layout } from '@/theme';
+import { layout } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { ColorToken } from '@/theme';
 
 type Props = {
@@ -27,6 +28,8 @@ export function ProgressRing({
   children,
   accessibilityLabel,
 }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const clamped = Math.min(1, Math.max(0, progress));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -71,10 +74,10 @@ export function ProgressRing({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   center: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

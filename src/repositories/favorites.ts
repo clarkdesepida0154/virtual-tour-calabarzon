@@ -23,7 +23,7 @@ export function createFavoritesRepository(client: SupabaseClient<Database>) {
       .select('*')
       .eq('device_id', userKey)
       .order('created_at', { ascending: false });
-    if (error) throw toAppError(error, 'We couldn’t load your favorites.');
+    if (error) throw toAppError(error, 'loadFavorites');
     return data;
   }
 
@@ -35,7 +35,7 @@ export function createFavoritesRepository(client: SupabaseClient<Database>) {
         { device_id: userKey, destination_id: destinationId },
         { onConflict: 'destination_id,device_id', ignoreDuplicates: true },
       );
-    if (error) throw toAppError(error, 'We couldn’t save this favorite.');
+    if (error) throw toAppError(error, 'saveFavorite');
   }
 
   /** Removes a favorite. Removing one that is not there is not an error. */
@@ -45,7 +45,7 @@ export function createFavoritesRepository(client: SupabaseClient<Database>) {
       .delete()
       .eq('device_id', userKey)
       .eq('destination_id', destinationId);
-    if (error) throw toAppError(error, 'We couldn’t remove this favorite.');
+    if (error) throw toAppError(error, 'removeFavorite');
   }
 
   /** Adds (`on`) or removes the favorite. */

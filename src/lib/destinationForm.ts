@@ -5,6 +5,7 @@
  */
 import type { Category, Province } from '@/constants/taxonomy';
 import type { Destination, DestinationInsert } from '@/types/database';
+import type { TranslationKey } from '@/i18n';
 
 /** Everything the user types is kept as text until it is saved. */
 export type DestinationFormValues = {
@@ -21,7 +22,8 @@ export type DestinationFormValues = {
 };
 
 export type DestinationFormField = keyof DestinationFormValues;
-export type DestinationFormErrors = Partial<Record<DestinationFormField, string>>;
+/** i18n keys of the messages to show under each invalid field. */
+export type DestinationFormErrors = Partial<Record<DestinationFormField, TranslationKey>>;
 
 export const FIELD_LIMITS = {
   name: 120,
@@ -84,33 +86,31 @@ export function parseCoordinate(text: string): number | null {
 function validateCoordinate(
   text: string,
   other: string,
-  label: 'Latitude' | 'Longitude',
+  axis: 'latitude' | 'longitude',
   limit: number,
-): string | undefined {
+): TranslationKey | undefined {
   const hasValue = text.trim().length > 0;
   const otherHasValue = other.trim().length > 0;
 
-  if (!hasValue) {
-    return otherHasValue ? `Add the ${label.toLowerCase()} too, or clear both.` : undefined;
-  }
+  if (!hasValue) return otherHasValue ? `form.errors.${axis}Pair` : undefined;
   const value = parseCoordinate(text);
-  if (value === null) return `${label} must be a number, like ${label === 'Latitude' ? '14.2136' : '121.1669'}.`;
-  if (Math.abs(value) > limit) return `${label} must be between -${limit} and ${limit}.`;
+  if (value === null) return `form.errors.${axis}Number`;
+  if (Math.abs(value) > limit) return `form.errors.${axis}Range`;
   return undefined;
 }
 
 export function validateDestinationForm(values: DestinationFormValues): DestinationFormErrors {
   const errors: DestinationFormErrors = {};
 
-  if (!values.name.trim()) errors.name = 'Give the destination a name.';
-  if (!values.category) errors.category = 'Choose a category.';
-  if (!values.province) errors.province = 'Choose a province.';
-  if (!values.address.trim()) errors.address = 'Add the address.';
-  if (!values.description.trim()) errors.description = 'Write a short description.';
+  if (!values.name.trim()) errors.name = 'form.errors.name';
+  if (!values.category) errors.category = 'form.errors.category';
+  if (!values.province) errors.province = 'form.errors.province';
+  if (!values.address.trim()) errors.address = 'form.errors.address';
+  if (!values.description.trim()) errors.description = 'form.errors.description';
 
-  const latitude = validateCoordinate(values.latitude, values.longitude, 'Latitude', 90);
+  const latitude = validateCoordinate(values.latitude, values.longitude, 'latitude', 90);
   if (latitude) errors.latitude = latitude;
-  const longitude = validateCoordinate(values.longitude, values.latitude, 'Longitude', 180);
+  const longitude = validateCoordinate(values.longitude, values.latitude, 'longitude', 180);
   if (longitude) errors.longitude = longitude;
 
   return errors;

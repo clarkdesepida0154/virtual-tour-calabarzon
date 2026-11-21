@@ -9,16 +9,22 @@ import type { LayoutRectangle } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { CATEGORY_META } from '@/constants/taxonomy';
+import { useI18n } from '@/context/I18nContext';
 import { regionForCoordinates } from '@/lib/mapRegion';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
 
+import { MapPin } from './MapPin';
 import type { DestinationMapProps } from './types';
 
-const PIN_SIZE = spacing.lg + spacing.xs;
+/** Size of an (unselected) MapPin, so its pointer tip sits on the coordinate. */
+const PIN_WIDTH = layout.pinHead + layout.pinShadowRoom * 2;
+const PIN_HEIGHT = layout.pinHead + layout.pinPointer - layout.pinRimWidth + layout.pinShadowRoom * 2;
 const GRID_LINES = 6;
 
 export function DestinationMap({ pins, selectedId, onSelect, onOpen, focus, insets }: DestinationMapProps) {
+  const styles = useStyles();
+  const { t, categoryLabel } = useI18n();
   const [frame, setFrame] = useState<LayoutRectangle | null>(null);
   const region = regionForCoordinates(pins);
   const focusedId = focus?.kind === 'pin' ? focus.id : null;
@@ -32,8 +38,8 @@ export function DestinationMap({ pins, selectedId, onSelect, onOpen, focus, inse
     const x = (longitude - (region.longitude - region.longitudeDelta / 2)) / region.longitudeDelta;
     const y = ((region.latitude + region.latitudeDelta / 2) - latitude) / region.latitudeDelta;
     return {
-      left: spacing.xxl + x * usableWidth - PIN_SIZE / 2,
-      top: usableTop + y * usableHeight - PIN_SIZE / 2,
+      left: spacing.xxl + x * usableWidth - PIN_WIDTH / 2,
+      top: usableTop + y * usableHeight - PIN_HEIGHT,
     };
   };
 
@@ -42,7 +48,7 @@ export function DestinationMap({ pins, selectedId, onSelect, onOpen, focus, inse
       style={styles.sheet}
       onPress={() => onSelect(null)}
       onLayout={(event) => setFrame(event.nativeEvent.layout)}
-      accessibilityLabel="Schematic map of destinations in CALABARZON">
+      accessibilityLabel={t('map.schematicA11y')}>
       {Array.from({ length: GRID_LINES }, (_, line) => (
         <View
           key={`h${line}`}
@@ -65,25 +71,22 @@ export function DestinationMap({ pins, selectedId, onSelect, onOpen, focus, inse
                 <Pressable
                   onPress={() => onSelect(pin.id)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${pin.name}, ${pin.category}`}
-                  hitSlop={spacing.sm}
-                  style={[
-                    styles.pin,
-                    { backgroundColor: colors[CATEGORY_META[pin.category].color] },
-                    isActive && styles.pinActive,
-                  ]}
-                />
+                  accessibilityLabel={t('map.pinA11y', { name: pin.name, category: categoryLabel(pin.category) })}
+                  hitSlop={spacing.xs}
+                  style={styles.pin}>
+                  <MapPin category={pin.category} selected={isActive} />
+                </Pressable>
                 {isActive ? (
                   <Pressable
                     onPress={() => onOpen(pin.id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Open ${pin.name}`}
+                    accessibilityLabel={t('map.openPin', { name: pin.name })}
                     style={styles.callout}>
                     <AppText variant="label" numberOfLines={1}>
                       {pin.name}
                     </AppText>
                     <AppText variant="caption" color="inkSoft" numberOfLines={1}>
-                      {pin.category}
+                      {categoryLabel(pin.category)}
                     </AppText>
                   </Pressable>
                 ) : null}
@@ -95,14 +98,14 @@ export function DestinationMap({ pins, selectedId, onSelect, onOpen, focus, inse
       <View style={[styles.note, { bottom: insets.bottom + spacing.sm }]} pointerEvents="none">
         <AppIcon name="information-outline" size="xs" color="muted" />
         <AppText variant="caption" color="muted">
-          Web preview: schematic map. The phone app shows Google Maps.
+          {t('map.webNote')}
         </AppText>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   sheet: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.surfaceMuted,
@@ -124,25 +127,19 @@ const styles = StyleSheet.create({
   },
   pinWrap: {
     position: 'absolute',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    width: PIN_WIDTH,
   },
   pinWrapActive: {
     zIndex: 2,
   },
   pin: {
-    width: PIN_SIZE,
-    height: PIN_SIZE,
-    borderRadius: radius.pill,
-    borderWidth: 3,
-    borderColor: colors.surface,
-    ...elevation.card,
-  },
-  pinActive: {
-    transform: [{ scale: 1.3 }],
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: PIN_HEIGHT,
   },
   callout: {
     marginTop: spacing.xs,
-    marginLeft: -spacing.xl,
     maxWidth: layout.featuredCardWidth,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -157,4 +154,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-});
+}));

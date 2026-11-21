@@ -9,7 +9,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { friendlyAuthMessage, validateSignIn, validateSignUp, hasErrors } from '../src/lib/authForm';
+import { tEnglish } from '../src/i18n';
+import { AUTH_MESSAGE_PARAMS, friendlyAuthMessage, validateSignIn, validateSignUp, hasErrors } from '../src/lib/authForm';
 import { splitLead } from '../src/lib/format';
 import { CALABARZON_REGION, hasCoordinates, regionForCoordinates } from '../src/lib/mapRegion';
 import { bestScoresByDestination, summarizeProgress } from '../src/lib/progress';
@@ -153,7 +154,7 @@ describe('result presentation', () => {
   });
 
   it('has a distinct message for a perfect score and for zero', () => {
-    assert.match(resultMessage({ score: 5, total: 5 }).title, /perfect/i);
+    assert.match(tEnglish(resultMessage({ score: 5, total: 5 }).title), /perfect/i);
     assert.notEqual(resultMessage({ score: 0, total: 5 }).title, resultMessage({ score: 2, total: 5 }).title);
   });
 });
@@ -234,11 +235,16 @@ describe('auth form validation', () => {
     assert.equal(hasErrors(validateSignUp({ email: 'a@b.ph', password: 'longenough', confirmPassword: 'longenough' })), false);
   });
 
-  it('turns Supabase auth errors into plain language', () => {
-    assert.match(friendlyAuthMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' }, 'x'), /don’t match/);
-    assert.match(friendlyAuthMessage({ message: 'Email not confirmed' }, 'x'), /confirm your email/);
-    assert.match(friendlyAuthMessage({ code: 'over_email_send_rate_limit', message: '' }, 'x'), /wait/);
-    assert.equal(friendlyAuthMessage({ message: 'something odd' }, 'fallback'), 'fallback');
+  it('turns Supabase auth errors into plain language (as i18n keys)', () => {
+    const english = (error: unknown) => {
+      const key = friendlyAuthMessage(error);
+      return key ? tEnglish(key, AUTH_MESSAGE_PARAMS) : null;
+    };
+    assert.match(english({ code: 'invalid_credentials', message: 'Invalid login credentials' }) ?? '', /don’t match/);
+    assert.match(english({ message: 'Email not confirmed' }) ?? '', /confirm your email/);
+    assert.match(english({ code: 'over_email_send_rate_limit', message: '' }) ?? '', /wait/);
+    assert.match(english({ code: 'weak_password', message: '' }) ?? '', /at least 8 characters/);
+    assert.equal(friendlyAuthMessage({ message: 'something odd' }), null);
   });
 });
 

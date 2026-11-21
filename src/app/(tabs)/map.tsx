@@ -1,12 +1,12 @@
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/AppIcon';
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
 import { CoverImage } from '@/components/CoverImage';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -14,16 +14,22 @@ import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryLegend } from '@/components/map/CategoryLegend';
 import { DestinationMap } from '@/components/map/DestinationMap';
 import type { MapFocus } from '@/components/map/types';
-import { CATEGORY_META, REGION_LABEL } from '@/constants/taxonomy';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { CATEGORY_META } from '@/constants/taxonomy';
 import type { Category } from '@/constants/taxonomy';
+import { useI18n } from '@/context/I18nContext';
 import { useMapPins } from '@/hooks/useDestinations';
 import { formatPlace } from '@/lib/format';
-import { colors, elevation, iconSize, layout, radius, spacing } from '@/theme';
+import { iconSize, layout, motion, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { DestinationPin } from '@/types/database';
 
 const CARD_HEIGHT = layout.listCardImageHeight - spacing.xxl;
 
 export default function MapScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
@@ -72,7 +78,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      {isFocused ? <StatusBar style="dark" /> : null}
+      {isFocused ? <ThemedStatusBar /> : null}
 
       {pinsQuery.status === 'success' && allPins.length > 0 ? (
         <DestinationMap
@@ -92,14 +98,14 @@ export default function MapScreen() {
         <View style={styles.titleRow}>
           <View style={styles.titles}>
             <AppText variant="overline" color="secondaryDark">
-              {REGION_LABEL}
+              {t('common.region')}
             </AppText>
             <AppText variant="screenTitle" accessibilityRole="header">
-              Map
+              {t('map.title')}
             </AppText>
           </View>
           {allPins.length > 0 ? (
-            <IconButton
+            <AppIconButton
               icon="arrow-expand-all"
               mode="contained"
               size={iconSize.md}
@@ -109,7 +115,7 @@ export default function MapScreen() {
                 setSelectedId(null);
                 setFocus({ kind: 'all', nonce: Date.now() });
               }}
-              accessibilityLabel="Show the whole region"
+              accessibilityLabel={t('map.showRegion')}
               style={styles.roundButton}
             />
           ) : null}
@@ -121,10 +127,10 @@ export default function MapScreen() {
       </View>
 
       {pinsQuery.status === 'loading' ? (
-        <View style={styles.centerState} accessibilityLabel="Loading the map">
+        <View style={styles.centerState} accessibilityLabel={t('map.loadingA11y')}>
           <ActivityIndicator color={colors.primary} size="large" />
           <AppText variant="label" color="inkSoft">
-            Plotting 5 provinces…
+            {t('map.loading')}
           </AppText>
         </View>
       ) : pinsQuery.status === 'error' && pinsQuery.error ? (
@@ -135,8 +141,8 @@ export default function MapScreen() {
         <View style={styles.centerState}>
           <EmptyState
             icon="map-marker-off-outline"
-            title="Nothing to plot yet"
-            message="None of the destinations has coordinates. Add a latitude and longitude when editing one."
+            title={t('map.empty.title')}
+            message={t('map.empty.message')}
           />
         </View>
       ) : null}
@@ -155,20 +161,30 @@ function SelectedCard({
   onOpen: () => void;
   onClose: () => void;
 }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, categoryLabel } = useI18n();
   const meta = CATEGORY_META[pin.category];
+  const category = categoryLabel(pin.category);
   return (
-    <View style={styles.cardWrap} pointerEvents="box-none">
+    <Animated.View
+      key={pin.id}
+      entering={FadeInDown.duration(motion.normal)}
+      style={styles.cardWrap}
+      pointerEvents="box-none">
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`${pin.name}, ${pin.category}. Open details`}
+        accessibilityLabel={`${t('map.pinA11y', { name: pin.name, category })}. ${t('map.viewDetails')}`}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-        <CoverImage uri={pin.cover_image_url} label={`Photo of ${pin.name}`} style={styles.thumb} />
+        <CoverImage uri={pin.cover_image_url} label={t('common.photoOf', { name: pin.name })} style={styles.thumb} />
         <View style={styles.cardBody}>
           <View style={styles.cardCategory}>
-            <View style={[styles.swatch, { backgroundColor: colors[meta.color] }]} />
-            <AppText variant="overline" color="secondaryDark" numberOfLines={1}>
-              {meta.shortLabel}
+            <View style={[styles.categoryChip, { backgroundColor: colors[meta.color] }]}>
+              <AppIcon name={meta.icon} size="xs" color="pinRim" />
+            </View>
+            <AppText variant="overline" color="secondaryDark" numberOfLines={1} style={styles.flex}>
+              {categoryLabel(pin.category, 'short')}
             </AppText>
           </View>
           <AppText variant="cardTitleSmall" numberOfLines={2}>
@@ -179,27 +195,27 @@ function SelectedCard({
           </AppText>
           <View style={styles.cardLink}>
             <AppText variant="label" color="primary">
-              View details
+              {t('map.viewDetails')}
             </AppText>
             <AppIcon name="arrow-right" size="xs" color="primary" />
           </View>
         </View>
       </Pressable>
-      <IconButton
+      <AppIconButton
         icon="close"
         size={iconSize.sm}
         mode="contained"
         containerColor={colors.surface}
         iconColor={colors.inkSoft}
         onPress={onClose}
-        accessibilityLabel="Close the preview"
+        accessibilityLabel={t('map.closePreview')}
         style={styles.cardClose}
       />
-    </View>
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   offline: {
     marginHorizontal: spacing.lg,
   },
@@ -249,18 +265,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     maxWidth: layout.maxContentWidth,
-    height: CARD_HEIGHT,
+    // A minimum, not a fixed height: large text sizes grow the card instead of clipping it.
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    borderWidth: layout.hairline,
+    borderColor: colors.outline,
     overflow: 'hidden',
     ...elevation.raised,
+  },
+  flex: {
+    flex: 1,
   },
   pressed: {
     opacity: layout.pressedOpacity,
   },
   thumb: {
     width: CARD_HEIGHT,
-    height: '100%',
+    alignSelf: 'stretch',
   },
   cardBody: {
     flex: 1,
@@ -274,10 +296,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  swatch: {
-    width: spacing.sm + 2,
-    height: spacing.sm + 2,
+  categoryChip: {
+    width: layout.legendSwatch,
+    height: layout.legendSwatch,
     borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardLink: {
     flexDirection: 'row',
@@ -291,4 +315,4 @@ const styles = StyleSheet.create({
     right: -spacing.xs,
     ...elevation.card,
   },
-});
+}));

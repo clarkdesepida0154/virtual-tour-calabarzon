@@ -1,8 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { KeyboardTypeOptions, TextInputProps } from 'react-native';
 import { HelperText, TextInput } from 'react-native-paper';
 
-import { colors, layout, maxFontScale, radius, typography } from '@/theme';
+import { layout, maxFontScale, radius, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
 type Props = {
   label: string;
@@ -37,6 +38,8 @@ export function FormTextField({
   disabled = false,
   onFocus,
 }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const message = error ?? helper;
 
   return (
@@ -72,7 +75,7 @@ export function FormTextField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   input: {
     backgroundColor: colors.surface,
   },
@@ -88,4 +91,4 @@ const styles = StyleSheet.create({
   helper: {
     ...typography.caption,
   },
-});
+}));

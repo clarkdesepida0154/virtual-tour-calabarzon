@@ -10,6 +10,7 @@
  */
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { catalogueCache } from '@/lib/appCache';
+import { groupCredits } from '@/lib/credits';
 import { countDestinations, pickFeatured } from '@/lib/featured';
 import { hasCoordinates } from '@/lib/mapRegion';
 import { CACHE_KEYS, filterSummaries } from '@/lib/offlineCache';
@@ -95,4 +96,15 @@ export function useMapPins() {
       },
     ),
   );
+}
+
+/** Every photo credit, grouped by destination (Settings → Photo credits). */
+export function usePhotoCredits() {
+  return useAsyncData('photo-credits', async () => {
+    const [catalogue, images] = await Promise.all([
+      loadCatalogue(),
+      catalogueCache.load('photo-credits', () => destinationImagesRepository.listAll()),
+    ]);
+    return groupCredits(catalogue, images);
+  });
 }

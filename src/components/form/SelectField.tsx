@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Keyboard, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Keyboard, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { Button, Dialog, HelperText, Portal, TextInput } from 'react-native-paper';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { colors, layout, maxFontScale, radius, spacing, typography } from '@/theme';
+import { layout, maxFontScale, radius, spacing, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 export type SelectOption<T extends string> = {
   value: T;
@@ -41,6 +43,9 @@ export function SelectField<T extends string>({
   required = false,
   disabled = false,
 }: Props<T>) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const { height } = useWindowDimensions();
   const selected = options.find((option) => option.value === value);
@@ -61,8 +66,8 @@ export function SelectField<T extends string>({
         onPress={openList}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${selected ? selected.label : 'not selected'}`}
-        accessibilityHint="Opens a list of choices">
+        accessibilityLabel={`${label}: ${selected ? selected.label : t('form.notSelected')}`}
+        accessibilityHint={t('form.selectHint')}>
         <View pointerEvents="none">
           <TextInput
             mode="outlined"
@@ -137,7 +142,7 @@ export function SelectField<T extends string>({
               onPress={() => setOpen(false)}
               textColor={colors.inkSoft}
               labelStyle={styles.buttonLabel}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -146,7 +151,7 @@ export function SelectField<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   input: {
     backgroundColor: colors.surface,
     paddingRight: spacing.xxl,
@@ -208,4 +213,4 @@ const styles = StyleSheet.create({
   buttonLabel: {
     ...typography.button,
   },
-});
+}));

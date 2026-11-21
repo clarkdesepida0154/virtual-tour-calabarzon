@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
 import type { ComponentRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { colors, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type FilterChipProps = {
   label: string;
@@ -18,6 +20,9 @@ type FilterChipProps = {
 
 /** A selectable pill. Filled terracotta when on, outlined when off. */
 export function FilterChip({ label, selected, onPress, icon, onLayout }: FilterChipProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   return (
     <Pressable
       onPress={onPress}
@@ -25,7 +30,7 @@ export function FilterChip({ label, selected, onPress, icon, onLayout }: FilterC
       hitSlop={spacing.xs}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${label} filter`}
+      accessibilityLabel={t('explore.chipA11y', { label })}
       android_ripple={{ color: colors.pressed, borderless: false }}
       style={({ pressed }) => [
         styles.chip,
@@ -66,6 +71,8 @@ export function FilterChipRow<T extends string>({
   selected,
   onToggle,
 }: FilterChipRowProps<T>) {
+  const styles = useStyles();
+  const { t } = useI18n();
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const chipOffsets = useRef(new Map<string, number>());
 
@@ -88,7 +95,7 @@ export function FilterChipRow<T extends string>({
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.row}
-      accessibilityLabel={`${title} filters`}>
+      accessibilityLabel={t('explore.chipRowA11y', { title })}>
       <View style={styles.title}>
         <AppText variant="overline" color="muted">
           {title}
@@ -108,7 +115,7 @@ export function FilterChipRow<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   row: {
     alignItems: 'center',
     gap: spacing.sm,
@@ -138,4 +145,4 @@ const styles = StyleSheet.create({
   chipPressed: {
     opacity: layout.pressedOpacity,
   },
-});
+}));

@@ -9,16 +9,15 @@
  * Details and Progress show.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, View } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import { ActivityIndicator, BackHandler, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeInRight, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
 import { Badge, BestScoreBadge } from '@/components/Badges';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -26,18 +25,20 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuizOptionCard } from '@/components/QuizOptionCard';
 import type { OptionState } from '@/components/QuizOptionCard';
 import { EmptyState, ErrorState } from '@/components/StateViews';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useDestination } from '@/hooks/useDestinations';
 import { useDestinationProgress, useQuiz } from '@/hooks/useProgress';
 import { successFeedback, tapFeedback } from '@/lib/device';
-import { toAppError } from '@/lib/errors';
 import type { BestScore } from '@/lib/progress';
 import { isCorrectAnswer, prepareQuiz, resultMessage, resultTone, scoreQuiz } from '@/lib/quiz';
 import type { QuizAnswers, QuizScore } from '@/lib/quiz';
 import { progressRepository } from '@/repositories';
-import { colors, elevation, iconSize, layout, motion, radius, spacing } from '@/theme';
+import { iconSize, layout, motion, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { QuizQuestionWithOptions } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -45,12 +46,15 @@ type Phase = 'intro' | 'question' | 'result';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export default function QuizScreen() {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { userKey } = useIdentity();
+  const { t } = useI18n();
   const { notifyChanged } = useDataSync();
   const destination = useDestination(id);
   const quiz = useQuiz(id);
@@ -140,7 +144,7 @@ export default function QuizScreen() {
     body = <ErrorState error={quiz.error} onRetry={quiz.retry} style={styles.state} />;
   } else if (!quiz.data || destination.status === 'loading') {
     body = (
-      <View style={styles.loading} accessibilityLabel="Loading the quiz">
+      <View style={styles.loading} accessibilityLabel={t('quiz.loadingA11y')}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -148,9 +152,9 @@ export default function QuizScreen() {
     body = (
       <EmptyState
         icon="help-circle-outline"
-        title="No quiz for this place yet"
-        message="Quizzes come with the destinations in the curated collection. Explore another destination to test your knowledge."
-        actionLabel="Back"
+        title={t('quiz.empty.title')}
+        message={t('quiz.empty.message')}
+        actionLabel={t('common.back')}
         actionIcon="arrow-left"
         onAction={close}
         style={styles.state}
@@ -198,24 +202,24 @@ export default function QuizScreen() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="dark" />
+      <ThemedStatusBar />
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.flex}>
           <AppText variant="overline" color="secondaryDark" numberOfLines={1}>
-            Knowledge check
+            {t('quiz.overline')}
           </AppText>
           <AppText variant="cardTitleSmall" numberOfLines={1}>
-            {name || 'Quiz'}
+            {name || t('quiz.title')}
           </AppText>
         </View>
-        <IconButton
+        <AppIconButton
           icon="close"
           mode="contained"
           size={iconSize.md}
           containerColor={colors.surface}
           iconColor={colors.ink}
           onPress={requestClose}
-          accessibilityLabel="Close the quiz"
+          accessibilityLabel={t('quiz.closeA11y')}
           style={styles.outlined}
         />
       </View>
@@ -224,10 +228,10 @@ export default function QuizScreen() {
 
       <ConfirmDialog
         visible={confirmLeave}
-        title="Leave the quiz?"
-        message="Your answers so far won’t be saved. You can start again any time."
-        confirmLabel="Leave"
-        cancelLabel="Keep going"
+        title={t('quiz.leaveDialog.title')}
+        message={t('quiz.leaveDialog.message')}
+        confirmLabel={t('quiz.leaveDialog.confirm')}
+        cancelLabel={t('quiz.leaveDialog.cancel')}
         onConfirm={() => {
           setConfirmLeave(false);
           close();
@@ -255,6 +259,8 @@ function IntroCard({
   attempts: number;
   onStart: () => void;
 }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
     <ScrollView contentContainerStyle={styles.centerContent} showsVerticalScrollIndicator={false}>
       <Animated.View entering={FadeIn.duration(motion.step)} style={styles.introCard}>
@@ -262,24 +268,24 @@ function IntroCard({
           <AppIcon name="head-question-outline" size="xl" color="secondaryDark" />
         </View>
         <AppText variant="sectionTitle" align="center" accessibilityRole="header">
-          How well do you know {name}?
+          {t('quiz.intro.title', { name })}
         </AppText>
         <View style={styles.rule} />
         <View style={styles.introFacts}>
-          <IntroFact icon="format-list-numbered" text={`${count} multiple-choice questions`} />
-          <IntroFact icon="book-open-page-variant-outline" text="Every answer is in the virtual tour" />
-          <IntroFact icon="refresh" text="Retake as often as you like — your best score is kept" />
+          <IntroFact icon="format-list-numbered" text={t('quiz.intro.questions', { count })} />
+          <IntroFact icon="book-open-page-variant-outline" text={t('quiz.intro.evidence')} />
+          <IntroFact icon="refresh" text={t('quiz.intro.retake')} />
         </View>
         {best ? (
           <View style={styles.introBest}>
             <BestScoreBadge score={best.score} total={best.total} />
             <AppText variant="caption" color="muted">
-              {attempts} {attempts === 1 ? 'attempt' : 'attempts'} so far
+              {t('quiz.intro.attempts', { count: attempts })}
             </AppText>
           </View>
         ) : null}
         <AppButton
-          label={best ? 'Retake the quiz' : 'Start the quiz'}
+          label={t(best ? 'quiz.result.retake' : 'quiz.intro.start')}
           icon="play"
           onPress={onStart}
           style={styles.stretch}
@@ -290,6 +296,7 @@ function IntroCard({
 }
 
 function IntroFact({ icon, text }: { icon: 'format-list-numbered' | 'book-open-page-variant-outline' | 'refresh'; text: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.introFact}>
       <AppIcon name={icon} size="sm" color="primary" />
@@ -317,6 +324,9 @@ function QuestionView({
   onNext: () => void;
   bottomInset: number;
 }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const answered = picked !== undefined;
   const correct = answered && isCorrectAnswer(question, picked);
   const isLast = index === total - 1;
@@ -333,7 +343,7 @@ function QuestionView({
       <ScrollView
         contentContainerStyle={[styles.questionContent, { paddingBottom: layout.actionBarHeight + bottomInset + spacing.xl }]}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.progressRow} accessible accessibilityLabel={`Question ${index + 1} of ${total}`}>
+        <View style={styles.progressRow} accessible accessibilityLabel={t('quiz.questionOf', { index: index + 1, count: total })}>
           {Array.from({ length: total }, (_, step) => (
             <View
               key={step}
@@ -344,7 +354,7 @@ function QuestionView({
 
         <Animated.View entering={FadeInRight.duration(motion.step)} style={styles.questionBlock}>
           <AppText variant="overline" color="secondaryDark">
-            Question {index + 1} of {total}
+            {t('quiz.questionOf', { index: index + 1, count: total })}
           </AppText>
           <AppText variant="question" accessibilityRole="header">
             {question.question_text}
@@ -372,7 +382,7 @@ function QuestionView({
             accessibilityLiveRegion="polite">
             <AppIcon name={correct ? 'check-circle' : 'information'} size="md" color={correct ? 'success' : 'primary'} />
             <AppText variant="bodyStrong" color={correct ? 'success' : 'primaryDark'} style={styles.flex}>
-              {correct ? 'Correct — well done!' : 'Not quite. The correct answer is highlighted in green.'}
+              {t(correct ? 'quiz.feedbackCorrect' : 'quiz.feedbackWrong')}
             </AppText>
           </Animated.View>
         ) : null}
@@ -380,12 +390,12 @@ function QuestionView({
 
       <View style={[styles.bottomBar, { paddingBottom: bottomInset + spacing.md }]}>
         <AppButton
-          label={isLast ? 'See my score' : 'Next question'}
+          label={t(isLast ? 'quiz.seeScore' : 'quiz.next')}
           icon={isLast ? 'flag-checkered' : 'arrow-right'}
           onPress={onNext}
           disabled={!answered}
           style={styles.flex}
-          accessibilityHint={answered ? undefined : 'Pick an answer first'}
+          accessibilityHint={answered ? undefined : t('quiz.pickFirst')}
         />
       </View>
     </View>
@@ -413,6 +423,8 @@ function ResultView({
   onTour: () => void;
   bottomInset: number;
 }) {
+  const styles = useStyles();
+  const { t } = useI18n();
   const tone = resultTone(result);
   const celebrate = tone === 'celebrate';
   const { title, message } = resultMessage(result);
@@ -433,7 +445,7 @@ function ResultView({
         <ProgressRing
           progress={result.total > 0 ? result.score / result.total : 0}
           color={celebrate ? 'success' : 'primary'}
-          accessibilityLabel={`You scored ${result.score} out of ${result.total}, ${result.percent} percent`}>
+          accessibilityLabel={t('quiz.result.scoreA11y', { score: result.score, total: result.total, percent: result.percent })}>
           <AppText variant="score" color={celebrate ? 'success' : 'primary'}>
             {result.score}
             <AppText variant="stat" color="muted">
@@ -447,27 +459,27 @@ function ResultView({
       </Animated.View>
 
       <View style={styles.resultBadges}>
-        {celebrate ? <Badge icon="trophy" label="Heritage scholar" tone="gold" /> : null}
-        {isNewBest ? <Badge icon="arrow-up-bold" label="New best" tone="success" /> : null}
+        {celebrate ? <Badge icon="trophy" label={t('quiz.result.scholar')} tone="gold" /> : null}
+        {isNewBest ? <Badge icon="arrow-up-bold" label={t('quiz.result.newBest')} tone="success" /> : null}
       </View>
 
       <AppText variant="screenTitle" align="center" accessibilityRole="header">
-        {title}
+        {t(title)}
       </AppText>
       <AppText variant="bodyLarge" color="inkSoft" align="center">
-        {message}
+        {t(message)}
       </AppText>
       <AppText variant="caption" color="muted" align="center">
-        Quiz · {name}
+        {t('quiz.result.caption', { name })}
       </AppText>
 
       <SaveStatus state={saveState} onRetry={onRetrySave} />
 
       <View style={styles.resultActions}>
-        <AppButton label="Retake the quiz" icon="refresh" onPress={onRetake} />
-        <AppButton label="Back to the destination" icon="arrow-left" variant="secondary" onPress={onBack} />
+        <AppButton label={t('quiz.result.retake')} icon="refresh" onPress={onRetake} />
+        <AppButton label={t('quiz.result.back')} icon="arrow-left" variant="secondary" onPress={onBack} />
         {!celebrate ? (
-          <AppButton label="Take the virtual tour again" icon="walk" variant="text" onPress={onTour} />
+          <AppButton label={t('quiz.result.tourAgain')} icon="walk" variant="text" onPress={onTour} />
         ) : null}
       </View>
     </ScrollView>
@@ -475,15 +487,18 @@ function ResultView({
 }
 
 function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   if (state === 'idle') return null;
   if (state === 'error') {
     return (
       <View style={[styles.saveRow, styles.saveError]} accessibilityRole="alert">
         <AppIcon name="cloud-alert" size="sm" color="error" />
         <AppText variant="label" color="error" style={styles.flex}>
-          {toAppError(null, 'Your score wasn’t saved.').message}
+          {`${t('quiz.result.saveFailed')} ${t('errors.suffix.unknown')}`}
         </AppText>
-        <AppButton label="Retry" variant="text" onPress={onRetry} />
+        <AppButton label={t('common.retry')} variant="text" onPress={onRetry} />
       </View>
     );
   }
@@ -495,13 +510,13 @@ function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void 
         <AppIcon name="cloud-check-outline" size="sm" color="success" />
       )}
       <AppText variant="label" color={state === 'saving' ? 'muted' : 'success'}>
-        {state === 'saving' ? 'Saving your score…' : 'Score saved to your progress'}
+        {t(state === 'saving' ? 'quiz.result.saving' : 'quiz.result.saved')}
       </AppText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -670,4 +685,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md,
   },
-});
+}));

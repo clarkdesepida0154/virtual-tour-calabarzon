@@ -32,15 +32,24 @@ export function distanceFrom(origin: Coordinate | null | undefined, place: Maybe
 }
 
 /**
- * "850 m away", "4.2 km away", "12.4 km away", "128 km away".
- * Metres are rounded to the nearest 10; very short distances read "Under 50 m away".
+ * The distance itself, language-neutral: "850 m", "4.2 km", "128 km".
+ * Metres are rounded to the nearest 10. Returns `'under-50'` for very short
+ * distances and `null` for an invalid value; the UI words it
+ * (`useI18n().distance`).
  */
+export function formatDistanceValue(km: number): string | 'under-50' | null {
+  if (!Number.isFinite(km) || km < 0) return null;
+  if (km < 0.05) return 'under-50';
+  if (km < 1) return `${Math.round((km * 1000) / 10) * 10} m`;
+  if (km < 100) return `${(Math.round(km * 10) / 10).toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+
+/** English wording: "850 m away", "12.4 km away", "Under 50 m away" (scripts, tests). */
 export function formatDistance(km: number): string {
-  if (!Number.isFinite(km) || km < 0) return '';
-  if (km < 0.05) return 'Under 50 m away';
-  if (km < 1) return `${Math.round((km * 1000) / 10) * 10} m away`;
-  if (km < 100) return `${(Math.round(km * 10) / 10).toFixed(1)} km away`;
-  return `${Math.round(km)} km away`;
+  const value = formatDistanceValue(km);
+  if (value === null) return '';
+  return value === 'under-50' ? 'Under 50 m away' : `${value} away`;
 }
 
 /**

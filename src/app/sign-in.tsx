@@ -1,30 +1,38 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppText } from '@/components/AppText';
 import { AuthLayout, AuthTextField, FormBanner } from '@/components/auth/AuthParts';
 import { useIdentity } from '@/context/IdentityContext';
-import { hasErrors, validateSignIn } from '@/lib/authForm';
+import { AUTH_MESSAGE_PARAMS, hasErrors, validateSignIn } from '@/lib/authForm';
 import type { AuthFormValues } from '@/lib/authForm';
 import { toAppError } from '@/lib/errors';
+import type { AppError } from '@/lib/errors';
 import { layout, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type Field = 'email' | 'password';
 
 export default function SignInScreen() {
+  const styles = useStyles();
   const router = useRouter();
+  const { t, errorMessage } = useI18n();
   const identity = useIdentity();
   const [values, setValues] = useState<AuthFormValues>({ email: '', password: '' });
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<AppError | null>(null);
   const [succeeded, setSucceeded] = useState(false);
 
   const errors = validateSignIn(values);
-  const errorFor = (field: Field) => (touched[field] || submitted ? errors[field] : undefined);
+  const errorFor = (field: Field) => {
+    const key = touched[field] || submitted ? errors[field] : undefined;
+    return key ? t(key, AUTH_MESSAGE_PARAMS) : undefined;
+  };
 
   const leave = () => {
     if (router.canGoBack()) router.back();
@@ -51,22 +59,22 @@ export default function SignInScreen() {
       await identity.signIn(values.email, values.password);
       setSucceeded(true);
     } catch (cause) {
-      setFormError(toAppError(cause, 'We couldn’t sign you in.').message);
+      setFormError(toAppError(cause, 'signIn'));
       setBusy(false);
     }
   };
 
   return (
     <AuthLayout
-      overline="Welcome back"
-      title="Sign In"
-      subtitle="Pick up your tours and quiz scores where you left them."
+      overline={t('auth.signIn.overline')}
+      title={t('auth.signIn.title')}
+      subtitle={t('auth.signIn.subtitle')}
       onBack={leave}>
-      {formError ? <FormBanner message={formError} /> : null}
+      {formError ? <FormBanner message={errorMessage(formError)} /> : null}
 
       <AuthTextField
         kind="email"
-        label="Email"
+        label={t('auth.email')}
         value={values.email}
         onChangeText={update('email')}
         onBlur={() => setTouched((current) => ({ ...current, email: true }))}
@@ -76,7 +84,7 @@ export default function SignInScreen() {
       />
       <AuthTextField
         kind="password"
-        label="Password"
+        label={t('auth.password')}
         value={values.password}
         onChangeText={update('password')}
         onBlur={() => setTouched((current) => ({ ...current, password: true }))}
@@ -86,11 +94,11 @@ export default function SignInScreen() {
         onSubmitEditing={submit}
       />
 
-      <AppButton label="Sign in" icon="login" onPress={submit} loading={busy} style={styles.submit} />
+      <AppButton label={t('auth.signIn.submit')} icon="login" onPress={submit} loading={busy} style={styles.submit} />
 
       <View style={styles.switch}>
         <AppText variant="body" color="inkSoft">
-          New here?
+          {t('auth.signIn.newHere')}
         </AppText>
         <Pressable
           onPress={() => router.replace('/sign-up')}
@@ -98,7 +106,7 @@ export default function SignInScreen() {
           hitSlop={spacing.md}
           style={({ pressed }) => pressed && styles.pressed}>
           <AppText variant="bodyStrong" color="primary">
-            Create an account
+            {t('auth.signIn.createAccount')}
           </AppText>
         </Pressable>
       </View>
@@ -106,7 +114,7 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   submit: {
     marginTop: spacing.sm,
   },
@@ -119,4 +127,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: layout.pressedOpacity,
   },
-});
+}));

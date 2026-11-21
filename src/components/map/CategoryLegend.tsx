@@ -1,9 +1,12 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { CATEGORIES, CATEGORY_META } from '@/constants/taxonomy';
 import type { Category } from '@/constants/taxonomy';
-import { colors, layout, radius, spacing } from '@/theme';
+import { useI18n } from '@/context/I18nContext';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
 type Props = {
   /** The category being shown alone, or null for all. */
@@ -13,41 +16,55 @@ type Props = {
 };
 
 /**
- * The map legend, doubling as a filter: each chip shows a category's pin
- * colour; tapping it shows only that category (tap again for all).
+ * The map legend, doubling as a filter, in the app's chip style: each chip
+ * carries the category's pin colour and how many pins it has; tapping one
+ * shows only that category (tap again for all). Scrolls sideways.
  */
 export function CategoryLegend({ selected, onChange, counts }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, categoryLabel } = useI18n();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
-      accessibilityLabel="Map legend and category filter">
+      accessibilityLabel={t('map.legendA11y')}>
       {CATEGORIES.map((category) => {
         const isOn = selected === category;
         const isDimmed = selected !== null && !isOn;
         const meta = CATEGORY_META[category];
+        const count = counts[category] ?? 0;
         return (
           <Pressable
             key={category}
             onPress={() => onChange(isOn ? null : category)}
             accessibilityRole="button"
             accessibilityState={{ selected: isOn }}
-            accessibilityLabel={`${category}, ${counts[category] ?? 0} on the map`}
-            accessibilityHint={isOn ? 'Shows every category again' : 'Shows only this category'}
+            accessibilityLabel={t('map.legendChipA11y', { label: categoryLabel(category), count })}
+            accessibilityHint={t(isOn ? 'map.legendShowAll' : 'map.legendShowOnly')}
+            android_ripple={{ color: colors.pressed }}
             style={({ pressed }) => [
               styles.chip,
               isOn && styles.chipOn,
               isDimmed && styles.chipDimmed,
               pressed && styles.pressed,
             ]}>
-            <View style={[styles.swatch, { backgroundColor: colors[meta.color] }]} />
+            {isOn ? (
+              <AppIcon name="check" size="xs" color="onPrimary" />
+            ) : (
+              <View style={[styles.swatch, { backgroundColor: colors[meta.color] }]}>
+                <AppIcon name={meta.icon} size="xs" color="pinRim" />
+              </View>
+            )}
             <AppText variant="label" color={isOn ? 'onPrimary' : 'ink'} numberOfLines={1}>
-              {meta.shortLabel}
+              {categoryLabel(category, 'short')}
             </AppText>
-            <AppText variant="caption" color={isOn ? 'onPrimaryMuted' : 'muted'}>
-              {counts[category] ?? 0}
-            </AppText>
+            <View style={[styles.count, isOn && styles.countOn]}>
+              <AppText variant="caption" color={isOn ? 'primary' : 'inkSoft'}>
+                {count}
+              </AppText>
+            </View>
           </Pressable>
         );
       })}
@@ -55,7 +72,7 @@ export function CategoryLegend({ selected, onChange, counts }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   row: {
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
@@ -64,28 +81,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    height: layout.chipHeight,
-    paddingHorizontal: spacing.md,
+    minHeight: layout.chipHeight,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.sm,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: layout.hairline,
-    borderColor: colors.outline,
+    borderColor: colors.outlineStrong,
   },
   chipOn: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
+    paddingLeft: spacing.md,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   chipDimmed: {
-    opacity: 0.6,
+    opacity: 0.72,
   },
   pressed: {
     opacity: layout.pressedOpacity,
   },
   swatch: {
-    width: spacing.md,
-    height: spacing.md,
+    width: layout.legendSwatch,
+    height: layout.legendSwatch,
     borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-});
+  count: {
+    minWidth: layout.legendSwatch,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+  },
+  countOn: {
+    backgroundColor: colors.onPrimary,
+  },
+}));

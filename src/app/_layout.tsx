@@ -8,20 +8,23 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { PaperProvider } from 'react-native-paper';
 
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { DataSyncProvider } from '@/context/DataSyncContext';
 import { ExploreFiltersProvider } from '@/context/ExploreFiltersContext';
 import { FavoritesProvider } from '@/context/FavoritesContext';
+import { I18nProvider } from '@/context/I18nContext';
 import { IdentityProvider, useIdentity } from '@/context/IdentityContext';
 import { LocationProvider } from '@/context/LocationContext';
+import { PreferencesProvider, usePreferences } from '@/context/PreferencesContext';
 import { ToastProvider } from '@/context/ToastContext';
-import { colors, navigationTheme, paperTheme } from '@/theme';
+import { AppThemeProvider, useAppTheme } from '@/theme/ThemeProvider';
 
-// Keep the splash screen up until the fonts and the saved session are ready,
-// so text never flashes in a fallback typeface and Welcome never flickers.
+// Keep the splash screen up until the fonts, the saved settings (theme,
+// language) and the saved session are ready, so text never flashes in a
+// fallback typeface, the wrong theme or language, and Welcome never flickers.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -38,11 +41,25 @@ export default function RootLayout() {
 
   // If the fonts fail to load the app still opens, using system fonts.
   const fontsReady = fontsLoaded || fontError !== null;
-  if (!fontsReady) return null;
 
   return (
-    <PaperProvider theme={paperTheme}>
-      <ThemeProvider value={navigationTheme}>
+    <PreferencesProvider>
+      <AppThemeProvider>
+        <I18nProvider>{fontsReady ? <ThemedApp /> : null}</I18nProvider>
+      </AppThemeProvider>
+    </PreferencesProvider>
+  );
+}
+
+/** Everything below the theme: drawn only once the saved settings are known. */
+function ThemedApp() {
+  const theme = useAppTheme();
+  const { isReady } = usePreferences();
+  if (!isReady) return null;
+
+  return (
+    <PaperProvider theme={theme.paper}>
+      <ThemeProvider value={theme.navigation}>
         <DataSyncProvider>
           <IdentityProvider>
             <LocationProvider>
@@ -50,7 +67,7 @@ export default function RootLayout() {
                 <ToastProvider>
                   <FavoritesProvider>
                     <RootNavigator />
-                    <StatusBar style="dark" />
+                    <ThemedStatusBar />
                   </FavoritesProvider>
                 </ToastProvider>
               </ExploreFiltersProvider>
@@ -69,6 +86,7 @@ export default function RootLayout() {
  * exactly the same features.
  */
 function RootNavigator() {
+  const { colors } = useAppTheme();
   const { isReady, needsWelcome, needsOnboarding } = useIdentity();
   const showWelcome = needsWelcome && !needsOnboarding;
   const showApp = !needsWelcome && !needsOnboarding;
@@ -111,6 +129,8 @@ function RootNavigator() {
           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
         />
         <Stack.Screen name="add" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="credits" />
       </Stack.Protected>
 
       {/* Reachable from Welcome and, for guests, from the Progress tab. */}

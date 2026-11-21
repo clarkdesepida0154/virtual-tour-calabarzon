@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, View } from 'react-native';
 import type { DimensionValue, StyleProp, ViewStyle } from 'react-native';
 
-import { colors, elevation, layout, motion, radius, spacing } from '@/theme';
+import { layout, motion, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -12,6 +14,7 @@ type SkeletonProps = {
 
 /** A softly pulsing placeholder block shown while content loads. */
 export function Skeleton({ width = '100%', height = spacing.lg, style }: SkeletonProps) {
+  const styles = useStyles();
   const [opacity] = useState(() => new Animated.Value(0.5));
 
   useEffect(() => {
@@ -38,8 +41,10 @@ export function Skeleton({ width = '100%', height = spacing.lg, style }: Skeleto
 
 /** Placeholder for one Explore list card. */
 export function DestinationCardSkeleton() {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
-    <View style={styles.card} accessible accessibilityLabel="Loading destination">
+    <View style={styles.card} accessible accessibilityLabel={t('form.loadingA11y')}>
       <Skeleton height={layout.listCardImageHeight} style={styles.cardImage} />
       <View style={styles.cardBody}>
         <Skeleton width="70%" height={spacing.xl} />
@@ -51,6 +56,7 @@ export function DestinationCardSkeleton() {
 
 /** Placeholder for one Home carousel card. */
 export function FeaturedCardSkeleton() {
+  const styles = useStyles();
   return (
     <Skeleton
       width={layout.featuredCardWidth}
@@ -62,8 +68,10 @@ export function FeaturedCardSkeleton() {
 
 /** Placeholder for the text block of the Details screen. */
 export function DetailsBodySkeleton() {
+  const styles = useStyles();
+  const { t } = useI18n();
   return (
-    <View style={styles.details} accessible accessibilityLabel="Loading destination">
+    <View style={styles.details} accessible accessibilityLabel={t('form.loadingA11y')}>
       <Skeleton width="40%" height={spacing.xl} style={styles.pill} />
       <Skeleton width="85%" height={spacing.xxl} />
       <Skeleton width="60%" height={spacing.lg} />
@@ -77,7 +85,7 @@ export function DetailsBodySkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   block: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.sm,
@@ -109,4 +117,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.sm,
   },
-});
+}));

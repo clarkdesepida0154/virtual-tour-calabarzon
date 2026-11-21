@@ -8,8 +8,10 @@ import { FavoriteButton } from '@/components/FavoriteButton';
 import { CategoryTag } from '@/components/Tag';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { formatPlace } from '@/lib/format';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { DestinationSummary } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
 
 type Props = {
   destination: DestinationSummary;
@@ -26,20 +28,27 @@ type CardProps = Props & {
  * where it is, and (with Near me) how far away.
  */
 export function DestinationCard({ destination, onPress, distance }: CardProps) {
+  const styles = useStyles();
+  const { t, categoryLabel } = useI18n();
+  const category = categoryLabel(destination.category);
   const place = formatPlace(destination);
 
   return (
     <Pressable
       onPress={() => onPress(destination)}
       accessibilityRole="button"
-      accessibilityLabel={`${destination.name}, ${destination.category}, ${place}${distance ? `, ${distance}` : ''}`}
-      accessibilityHint="Opens the destination details"
+      accessibilityLabel={
+        distance
+          ? t('explore.cardDistanceA11y', { name: destination.name, category, place, distance })
+          : t('explore.cardA11y', { name: destination.name, category, place })
+      }
+      accessibilityHint={t('common.opensDetails')}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.clip}>
         <View>
           <CoverImage
             uri={destination.cover_image_url}
-            label={`Photo of ${destination.name}`}
+            label={t('common.photoOf', { name: destination.name })}
             style={styles.image}
           />
           <View style={styles.tag}>
@@ -78,19 +87,22 @@ export function DestinationCard({ destination, onPress, distance }: CardProps) {
 
 /** Home carousel card: a tall photo with the name set over a dark fade. */
 export function FeaturedCard({ destination, onPress }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t, categoryLabel } = useI18n();
   const place = formatPlace(destination);
 
   return (
     <Pressable
       onPress={() => onPress(destination)}
       accessibilityRole="button"
-      accessibilityLabel={`Featured: ${destination.name}, ${place}`}
-      accessibilityHint="Opens the destination details"
+      accessibilityLabel={t('home.featured.cardA11y', { name: destination.name, place })}
+      accessibilityHint={t('common.opensDetails')}
       style={({ pressed }) => [styles.featured, pressed && styles.pressed]}>
       <View style={styles.featuredClip}>
         <CoverImage
           uri={destination.cover_image_url}
-          label={`Photo of ${destination.name}`}
+          label={t('common.photoOf', { name: destination.name })}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
@@ -102,13 +114,13 @@ export function FeaturedCard({ destination, onPress }: Props) {
           <View style={styles.featuredCategory}>
             <AppIcon name={CATEGORY_META[destination.category].icon} size="xs" color="secondary" />
             <AppText variant="overline" color="secondary" numberOfLines={1}>
-              {CATEGORY_META[destination.category].shortLabel}
+              {categoryLabel(destination.category, 'short')}
             </AppText>
           </View>
-          <AppText variant="cardTitle" color="onPrimary" numberOfLines={3}>
+          <AppText variant="cardTitle" color="onPhoto" numberOfLines={3}>
             {destination.name}
           </AppText>
-          <AppText variant="label" color="onPrimaryMuted" numberOfLines={1}>
+          <AppText variant="label" color="onPhotoMuted" numberOfLines={1}>
             {place}
           </AppText>
         </View>
@@ -117,7 +129,7 @@ export function FeaturedCard({ destination, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -178,4 +190,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-});
+}));

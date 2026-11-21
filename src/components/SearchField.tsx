@@ -1,8 +1,8 @@
-import { StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Searchbar } from 'react-native-paper';
 
-import { colors, elevation, layout, maxFontScale, radius, typography } from '@/theme';
+import { layout, maxFontScale, radius, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
 type Props = {
   value: string;
@@ -24,6 +24,8 @@ export function SearchField({
   tone = 'flat',
   style,
 }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   return (
     <Searchbar
       value={value}
@@ -44,7 +46,7 @@ export function SearchField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   bar: {
     height: layout.searchBarHeight,
     borderRadius: radius.pill,
@@ -62,4 +64,4 @@ const styles = StyleSheet.create({
     color: colors.ink,
     minHeight: layout.searchBarHeight,
   },
-});
+}));

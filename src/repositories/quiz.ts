@@ -20,7 +20,7 @@ export function createQuizRepository(client: SupabaseClient<Database>) {
       .select('id, destination_id, question_text, sort_order, quiz_options(id, option_text, is_correct)')
       .eq('destination_id', destinationId)
       .order('sort_order', { ascending: true });
-    if (error) throw toAppError(error, 'We couldn’t load the quiz.');
+    if (error) throw toAppError(error, 'loadQuiz');
 
     return data.map(({ quiz_options: options, ...question }) => ({ ...question, options }));
   }

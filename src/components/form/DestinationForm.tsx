@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   View,
 } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
@@ -21,7 +20,7 @@ import type { CoverState } from '@/components/form/CoverPhotoField';
 import { FormTextField } from '@/components/form/FormTextField';
 import { SelectField } from '@/components/form/SelectField';
 import type { SelectOption } from '@/components/form/SelectField';
-import { CATEGORIES, CATEGORY_META, PROVINCES, PROVINCE_META } from '@/constants/taxonomy';
+import { CATEGORIES, CATEGORY_META, PROVINCES } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useToast } from '@/context/ToastContext';
@@ -38,22 +37,12 @@ import type { DestinationFormField, DestinationFormValues } from '@/lib/destinat
 import { toAppError } from '@/lib/errors';
 import type { AppError } from '@/lib/errors';
 import { destinationImagesRepository, destinationsRepository } from '@/repositories';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
 import type { Destination } from '@/types/database';
+import { useI18n } from '@/context/I18nContext';
+import type { TranslationKey } from '@/i18n';
 
-const CATEGORY_OPTIONS: SelectOption<Category>[] = CATEGORIES.map((category) => ({
-  value: category,
-  label: category,
-  description: CATEGORY_META[category].blurb,
-  icon: CATEGORY_META[category].icon,
-}));
-
-const PROVINCE_OPTIONS: SelectOption<Province>[] = PROVINCES.map((province) => ({
-  value: province,
-  label: province,
-  description: PROVINCE_META[province].tagline,
-  icon: 'map-marker-outline',
-}));
 
 /** How long to wait for the keyboard / layout to settle before measuring. */
 const REVEAL_DELAY_MS = 120;
@@ -77,6 +66,23 @@ type Props = {
  * removed again.
  */
 export function DestinationForm({ destination, onSaved, onCancel }: Props) {
+  const styles = useStyles();
+  const { t, categoryLabel, provinceTagline, errorMessage } = useI18n();
+  // Labels follow the UI language; the stored values stay English.
+  const categoryOptions: SelectOption<Category>[] = CATEGORIES.map((category) => ({
+    value: category,
+    label: categoryLabel(category),
+    description: categoryLabel(category, 'blurb'),
+    icon: CATEGORY_META[category].icon,
+  }));
+  const provinceOptions: SelectOption<Province>[] = PROVINCES.map((province) => ({
+    value: province,
+    label: province,
+    description: provinceTagline(province),
+    icon: 'map-marker-outline',
+  }));
+  /** Field errors are i18n keys. */
+  const fieldError = (key: TranslationKey | undefined) => (key ? t(key) : undefined);
   const insets = useSafeAreaInsets();
   const { notifyChanged } = useDataSync();
   const { showToast } = useToast();
@@ -163,7 +169,7 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
     const firstInvalid = firstInvalidField(found);
     if (firstInvalid) {
       setShowErrors(true);
-      showToast('Please complete the highlighted fields.');
+      showToast(t('form.errors.fixFields'));
       setTimeout(() => revealField(firstInvalid), REVEAL_DELAY_MS);
       return;
     }
@@ -199,7 +205,7 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
     } catch (cause) {
       // Don't leave an orphaned upload behind when the row could not be saved.
       if (uploadedUrl) void destinationImagesRepository.removeByPublicUrl(uploadedUrl);
-      setSaveError(toAppError(cause, 'We couldn’t save the destination.'));
+      setSaveError(toAppError(cause, 'saveDestination'));
     } finally {
       setStage(null);
     }
@@ -208,8 +214,8 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
   const stepCount = cover.kind === 'local' ? 2 : 1;
   const stageLabel =
     stage === 'uploading'
-      ? `Step 1 of ${stepCount} · Uploading photo…`
-      : `Step ${stepCount} of ${stepCount} · Saving destination…`;
+      ? t('form.uploading', { count: stepCount })
+      : t('form.saving', { count: stepCount });
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
@@ -228,20 +234,20 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
           ]}>
           <FormSection
             icon="image-outline"
-            title="Cover photo"
-            subtitle="Optional — the main picture visitors see first.">
+            title={t('form.coverSection')}
+            subtitle={t('form.coverSubtitle')}>
             <CoverPhotoField cover={cover} onChange={setCover} disabled={isSaving} />
           </FormSection>
 
-          <FormSection icon="bank-outline" title="About the place">
+          <FormSection icon="bank-outline" title={t('form.aboutSection')}>
             <FieldAnchor field="name" onRegister={registerField}>
               <FormTextField
-                label="Name"
+                label={t('form.name')}
                 required
                 value={values.name}
                 onChangeText={(text) => setField('name', text)}
                 onFocus={() => handleFocus('name')}
-                error={errors.name}
+                error={fieldError(errors.name)}
                 maxLength={FIELD_LIMITS.name}
                 autoCapitalize="words"
                 disabled={isSaving}
@@ -249,52 +255,52 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
             </FieldAnchor>
             <FieldAnchor field="category" onRegister={registerField}>
               <SelectField
-                label="Category"
-                title="Choose a category"
+                label={t('form.category')}
+                title={t('form.chooseCategory')}
                 required
-                options={CATEGORY_OPTIONS}
+                options={categoryOptions}
                 value={values.category}
                 onChange={(category) => setField('category', category)}
-                error={errors.category}
+                error={fieldError(errors.category)}
                 disabled={isSaving}
               />
             </FieldAnchor>
             <FieldAnchor field="description" onRegister={registerField}>
               <FormTextField
-                label="Description"
+                label={t('form.description')}
                 required
                 multiline
                 value={values.description}
                 onChangeText={(text) => setField('description', text)}
                 onFocus={() => handleFocus('description')}
-                error={errors.description}
-                helper="Two or three sentences on what it is and why it matters."
+                error={fieldError(errors.description)}
+                helper={t('form.descriptionHelper')}
                 maxLength={FIELD_LIMITS.description}
                 disabled={isSaving}
               />
             </FieldAnchor>
           </FormSection>
 
-          <FormSection icon="map-marker-outline" title="Location">
+          <FormSection icon="map-marker-outline" title={t('form.locationSection')}>
             <FieldAnchor field="province" onRegister={registerField}>
               <SelectField
-                label="Province"
-                title="Choose a province"
+                label={t('form.province')}
+                title={t('form.chooseProvince')}
                 required
-                options={PROVINCE_OPTIONS}
+                options={provinceOptions}
                 value={values.province}
                 onChange={(province) => setField('province', province)}
-                error={errors.province}
+                error={fieldError(errors.province)}
                 disabled={isSaving}
               />
             </FieldAnchor>
             <FieldAnchor field="municipality" onRegister={registerField}>
               <FormTextField
-                label="City or municipality"
+                label={t('form.municipality')}
                 value={values.municipality}
                 onChangeText={(text) => setField('municipality', text)}
                 onFocus={() => handleFocus('municipality')}
-                error={errors.municipality}
+                error={fieldError(errors.municipality)}
                 maxLength={FIELD_LIMITS.municipality}
                 autoCapitalize="words"
                 disabled={isSaving}
@@ -302,12 +308,12 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
             </FieldAnchor>
             <FieldAnchor field="address" onRegister={registerField}>
               <FormTextField
-                label="Address"
+                label={t('form.address')}
                 required
                 value={values.address}
                 onChangeText={(text) => setField('address', text)}
                 onFocus={() => handleFocus('address')}
-                error={errors.address}
+                error={fieldError(errors.address)}
                 maxLength={FIELD_LIMITS.address}
                 disabled={isSaving}
               />
@@ -315,11 +321,11 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
             <View style={styles.coordinates}>
               <FieldAnchor field="latitude" onRegister={registerField} style={styles.flex}>
                 <FormTextField
-                  label="Latitude"
+                  label={t('form.latitude')}
                   value={values.latitude}
                   onChangeText={(text) => setField('latitude', text)}
                   onFocus={() => handleFocus('latitude')}
-                  error={errors.latitude}
+                  error={fieldError(errors.latitude)}
                   placeholder="14.2136"
                   keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                   autoCapitalize="none"
@@ -328,11 +334,11 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
               </FieldAnchor>
               <FieldAnchor field="longitude" onRegister={registerField} style={styles.flex}>
                 <FormTextField
-                  label="Longitude"
+                  label={t('form.longitude')}
                   value={values.longitude}
                   onChangeText={(text) => setField('longitude', text)}
                   onFocus={() => handleFocus('longitude')}
-                  error={errors.longitude}
+                  error={fieldError(errors.longitude)}
                   placeholder="121.1669"
                   keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                   autoCapitalize="none"
@@ -341,35 +347,34 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
               </FieldAnchor>
             </View>
             <AppText variant="caption" color="inkSoft">
-              Coordinates are optional. They will place the destination on the map in a later
-              update.
+              {t('form.coordinatesNote')}
             </AppText>
           </FormSection>
 
           <FormSection
             icon="book-open-page-variant-outline"
-            title="Virtual tour content"
-            subtitle="Optional — each one appears as its own section on the destination page.">
+            title={t('form.tourSection')}
+            subtitle={t('form.tourSubtitle')}>
             <FieldAnchor field="history" onRegister={registerField}>
               <FormTextField
-                label="History"
+                label={t('form.history')}
                 multiline
                 value={values.history}
                 onChangeText={(text) => setField('history', text)}
                 onFocus={() => handleFocus('history')}
-                error={errors.history}
+                error={fieldError(errors.history)}
                 maxLength={FIELD_LIMITS.longText}
                 disabled={isSaving}
               />
             </FieldAnchor>
             <FieldAnchor field="culturalSignificance" onRegister={registerField}>
               <FormTextField
-                label="Cultural significance"
+                label={t('form.culture')}
                 multiline
                 value={values.culturalSignificance}
                 onChangeText={(text) => setField('culturalSignificance', text)}
                 onFocus={() => handleFocus('culturalSignificance')}
-                error={errors.culturalSignificance}
+                error={fieldError(errors.culturalSignificance)}
                 maxLength={FIELD_LIMITS.longText}
                 disabled={isSaving}
               />
@@ -385,7 +390,7 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
                   color="error"
                 />
                 <AppText variant="body" color="error" style={styles.flex}>
-                  {saveError.message}
+                  {errorMessage(saveError)}
                 </AppText>
               </View>
             ) : null}
@@ -400,16 +405,16 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
             ) : null}
 
             <AppButton
-              label={isEditing ? 'Save changes' : 'Add destination'}
+              label={t(isEditing ? 'form.saveChanges' : 'form.addDestination')}
               icon="check"
               onPress={handleSubmit}
               loading={isSaving}
             />
             {onCancel ? (
-              <AppButton label="Cancel" variant="text" onPress={onCancel} disabled={isSaving} />
+              <AppButton label={t('form.cancel')} variant="text" onPress={onCancel} disabled={isSaving} />
             ) : null}
             <AppText variant="caption" color="muted" align="center">
-              Fields marked * are required.
+              {t('form.required')}
             </AppText>
           </View>
         </ScrollView>
@@ -447,6 +452,7 @@ type FormSectionProps = {
 
 /** A white card grouping related fields under a serif heading. */
 function FormSection({ icon, title, subtitle, children }: FormSectionProps) {
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -469,7 +475,7 @@ function FormSection({ icon, title, subtitle, children }: FormSectionProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   flex: {
     flex: 1,
   },
@@ -521,4 +527,4 @@ const styles = StyleSheet.create({
   progress: {
     gap: spacing.sm,
   },
-});
+}));

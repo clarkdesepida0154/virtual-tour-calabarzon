@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { HelperText, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, layout, maxFontScale, radius, spacing, typography } from '@/theme';
+import { layout, maxFontScale, radius, spacing, typography } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type LayoutProps = {
   overline: string;
@@ -20,6 +22,7 @@ type LayoutProps = {
 
 /** Shared frame of the Sign In and Sign Up screens: header, keyboard-safe scroll. */
 export function AuthLayout({ overline, title, subtitle, onBack, children }: LayoutProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
@@ -64,6 +67,9 @@ export function AuthTextField({
   returnKeyType,
   onSubmitEditing,
 }: FieldProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const [revealed, setRevealed] = useState(false);
   const isPassword = kind !== 'email';
   const message = error ?? helper;
@@ -100,7 +106,7 @@ export function AuthTextField({
               icon={revealed ? 'eye-off-outline' : 'eye-outline'}
               color={colors.inkSoft}
               onPress={() => setRevealed((current) => !current)}
-              accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+              accessibilityLabel={t(revealed ? 'auth.hidePassword' : 'auth.showPassword')}
             />
           ) : undefined
         }
@@ -116,6 +122,7 @@ export function AuthTextField({
 
 /** A form-level message: the server's answer, in plain words. */
 export function FormBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' }) {
+  const styles = useStyles();
   const isError = tone === 'error';
   return (
     <View
@@ -134,7 +141,7 @@ export function FormBanner({ message, tone = 'error' }: { message: string; tone?
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -175,4 +182,4 @@ const styles = StyleSheet.create({
   bannerInfo: {
     backgroundColor: colors.successSoft,
   },
-});
+}));

@@ -24,6 +24,7 @@
     "expo-linking": "~58.0.17",
     "expo-location": "~58.0.22",
     "expo-router": "~58.0.32",
+    "expo-speech": "~58.0.4",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-symbols": "~58.0.5",
@@ -69,6 +70,7 @@
     "db:seed": "node scripts/seed-full-dataset.js",
     "db:sync-photos": "node scripts/sync-photos.js",
     "data:check": "node scripts/check-dataset.js",
+    "i18n:check": "tsx scripts/i18n-check.ts",
     "secrets:check": "node scripts/secret-scan.js",
     "images:fetch": "node scripts/fetch-images.js",
     "images:find": "node scripts/find-commons-images.js"

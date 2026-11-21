@@ -1,7 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { ProgressBar } from 'react-native-paper';
 
-import { colors, layout, radius } from '@/theme';
+import { layout, radius } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
 type Props = {
   /** When false the bar is invisible but still reserves its height. */
@@ -18,6 +19,8 @@ type Props = {
  * always lives inside this fixed-height box.
  */
 export function LinearProgress({ visible = true, tone = 'bare', accessibilityLabel }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
   return (
     <View style={styles.box} accessibilityLabel={visible ? accessibilityLabel : undefined}>
       <ProgressBar
@@ -30,7 +33,7 @@ export function LinearProgress({ visible = true, tone = 'bare', accessibilityLab
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   box: {
     height: layout.progressBarHeight,
     overflow: 'hidden',
@@ -43,4 +46,4 @@ const styles = StyleSheet.create({
   track: {
     backgroundColor: colors.primarySoft,
   },
-});
+}));

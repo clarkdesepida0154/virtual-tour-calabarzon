@@ -5,6 +5,7 @@
  * Node (tests/quiz.test.ts) and reused by scripts/verify-crud.mjs.
  */
 import type { QuizQuestionWithOptions } from '@/types/database';
+import type { TranslationKey } from '@/i18n';
 
 /** A source of numbers in [0, 1). Injected so tests can be deterministic. */
 export type RandomSource = () => number;
@@ -75,29 +76,20 @@ export function resultTone({ score, total }: Pick<QuizScore, 'score' | 'total'>)
 }
 
 /** Heading and message for the score screen. */
-export function resultMessage(result: Pick<QuizScore, 'score' | 'total'>): { title: string; message: string } {
+/** i18n keys of the score screen's heading and message for this result. */
+export function resultMessage(
+  result: Pick<QuizScore, 'score' | 'total'>,
+): { title: TranslationKey; message: TranslationKey } {
   if (result.total > 0 && result.score === result.total) {
-    return {
-      title: 'A perfect score!',
-      message: 'You answered every question correctly. A true heritage scholar.',
-    };
+    return { title: 'quiz.result.perfectTitle', message: 'quiz.result.perfectMessage' };
   }
   if (resultTone(result) === 'celebrate') {
-    return {
-      title: 'Excellent work!',
-      message: 'You clearly took the tour to heart. Only a detail or two slipped by.',
-    };
+    return { title: 'quiz.result.celebrateTitle', message: 'quiz.result.celebrateMessage' };
   }
   if (result.score === 0) {
-    return {
-      title: 'Every expert starts here',
-      message: 'Take the virtual tour again — the answers are all in its chapters — then try once more.',
-    };
+    return { title: 'quiz.result.zeroTitle', message: 'quiz.result.zeroMessage' };
   }
-  return {
-    title: 'Good effort!',
-    message: 'You are on your way. Revisit the History and Cultural Significance chapters, then retake the quiz.',
-  };
+  return { title: 'quiz.result.encourageTitle', message: 'quiz.result.encourageMessage' };
 }
 
 /** The best of several attempts: highest ratio, then the most recent. */

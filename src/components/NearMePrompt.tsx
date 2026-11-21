@@ -1,10 +1,12 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { useUserLocation } from '@/context/LocationContext';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 /**
  * The polite way in to "Near me": explains what location is used for before
@@ -12,6 +14,8 @@ import { colors, elevation, layout, radius, spacing } from '@/theme';
  * asked and the person has not tapped "Not now".
  */
 export function NearMePrompt() {
+  const styles = useStyles();
+  const { t } = useI18n();
   const location = useUserLocation();
   if (location.status !== 'undetermined' || location.promptDismissed) return null;
 
@@ -22,28 +26,27 @@ export function NearMePrompt() {
           <AppIcon name="crosshairs-gps" size="sm" color="secondaryDark" />
         </View>
         <View style={styles.flex}>
-          <AppText variant="subtitle">See what is near you</AppText>
+          <AppText variant="subtitle">{t('nearMe.promptTitle')}</AppText>
           <AppText variant="caption" color="inkSoft">
-            Show how far each destination is and sort them nearest first. Your location stays on
-            this phone.
+            {t('nearMe.promptBody')}
           </AppText>
         </View>
       </View>
       <View style={styles.actions}>
         <AppButton
-          label="Allow location"
+          label={t('nearMe.allow')}
           icon="crosshairs-gps"
           variant="secondary"
           onPress={() => void location.requestPermission()}
           style={styles.flex}
         />
-        <AppButton label="Not now" variant="text" onPress={location.dismissPrompt} />
+        <AppButton label={t('nearMe.notNow')} variant="text" onPress={location.dismissPrompt} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   card: {
     gap: spacing.md,
     padding: spacing.lg,
@@ -72,4 +75,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-});
+}));

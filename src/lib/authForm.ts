@@ -1,8 +1,16 @@
 /**
  * Sign-in / sign-up form validation and friendly auth error messages.
  * Pure — no React Native imports — so it can be tested in Node.
+ *
+ * Messages are i18n keys (see src/i18n/en.ts → `auth.errors`); screens show
+ * them with `t(key, AUTH_MESSAGE_PARAMS)`.
  */
+import type { TranslationKey } from '@/i18n';
+
 export const PASSWORD_MIN_LENGTH = 8;
+
+/** Placeholder values used by the auth messages (`{{min}}`). */
+export const AUTH_MESSAGE_PARAMS = { min: PASSWORD_MIN_LENGTH } as const;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -13,12 +21,12 @@ export type AuthFormValues = {
   confirmPassword?: string;
 };
 
-export type AuthFormErrors = Partial<Record<keyof AuthFormValues, string>>;
+export type AuthFormErrors = Partial<Record<keyof AuthFormValues, TranslationKey>>;
 
-export function validateEmail(email: string): string | undefined {
+export function validateEmail(email: string): TranslationKey | undefined {
   const trimmed = email.trim();
-  if (!trimmed) return 'Enter your email address.';
-  if (!EMAIL_PATTERN.test(trimmed)) return 'That doesn’t look like an email address.';
+  if (!trimmed) return 'auth.errors.emailRequired';
+  if (!EMAIL_PATTERN.test(trimmed)) return 'auth.errors.emailInvalid';
   return undefined;
 }
 
@@ -26,7 +34,7 @@ export function validateSignIn(values: AuthFormValues): AuthFormErrors {
   const errors: AuthFormErrors = {};
   const email = validateEmail(values.email);
   if (email) errors.email = email;
-  if (!values.password) errors.password = 'Enter your password.';
+  if (!values.password) errors.password = 'auth.errors.passwordRequired';
   return errors;
 }
 
@@ -34,13 +42,11 @@ export function validateSignUp(values: AuthFormValues): AuthFormErrors {
   const errors: AuthFormErrors = {};
   const email = validateEmail(values.email);
   if (email) errors.email = email;
-  if (!values.password) errors.password = 'Choose a password.';
-  else if (values.password.length < PASSWORD_MIN_LENGTH) {
-    errors.password = `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
-  }
-  if (!values.confirmPassword) errors.confirmPassword = 'Type the password again.';
+  if (!values.password) errors.password = 'auth.errors.passwordChoose';
+  else if (values.password.length < PASSWORD_MIN_LENGTH) errors.password = 'auth.errors.passwordShort';
+  if (!values.confirmPassword) errors.confirmPassword = 'auth.errors.confirmRequired';
   else if (values.password && values.confirmPassword !== values.password) {
-    errors.confirmPassword = 'The two passwords don’t match.';
+    errors.confirmPassword = 'auth.errors.confirmMismatch';
   }
   return errors;
 }
@@ -50,38 +56,38 @@ export function hasErrors(errors: AuthFormErrors): boolean {
 }
 
 /**
- * Maps a Supabase Auth error (code or message) to plain language.
- * Unknown errors fall back to `fallback`.
+ * Maps a Supabase Auth error (code or message) to a plain-language message
+ * key, or `null` when the error is not one we recognise.
  */
-export function friendlyAuthMessage(error: unknown, fallback: string): string {
+export function friendlyAuthMessage(error: unknown): TranslationKey | null {
   const code = readField(error, 'code');
   const message = readField(error, 'message').toLowerCase();
 
   if (code === 'invalid_credentials' || message.includes('invalid login credentials')) {
-    return 'That email and password don’t match an account. Check them and try again.';
+    return 'auth.errors.invalidCredentials';
   }
   if (code === 'email_not_confirmed' || message.includes('email not confirmed')) {
-    return 'Please confirm your email first — open the link we sent to your inbox, then sign in.';
+    return 'auth.errors.emailNotConfirmed';
   }
   if (code === 'user_already_exists' || code === 'email_exists' || message.includes('already registered')) {
-    return 'An account with this email already exists. Try signing in instead.';
+    return 'auth.errors.userExists';
   }
   if (code === 'weak_password' || message.includes('password should')) {
-    return `That password is too weak. Use at least ${PASSWORD_MIN_LENGTH} characters, mixing letters and numbers.`;
+    return 'auth.errors.weakPassword';
   }
-  if (code === 'email_address_invalid' || message.includes('email address') && message.includes('invalid')) {
-    return 'That email address can’t be used. Please check it, or use a different one.';
+  if (code === 'email_address_invalid' || (message.includes('email address') && message.includes('invalid'))) {
+    return 'auth.errors.emailUnusable';
   }
   if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || message.includes('rate limit')) {
-    return 'Too many attempts in a short time. Please wait a few minutes and try again.';
+    return 'auth.errors.rateLimited';
   }
   if (code === 'signup_disabled' || message.includes('signups not allowed')) {
-    return 'New accounts can’t be created right now. You can still continue as a guest.';
+    return 'auth.errors.signupDisabled';
   }
   if (/network|fetch failed|failed to fetch|timed? ?out/.test(message)) {
-    return 'We couldn’t reach the server. Check your internet connection and try again.';
+    return 'auth.errors.network';
   }
-  return fallback;
+  return null;
 }
 
 function readField(error: unknown, field: 'code' | 'message'): string {

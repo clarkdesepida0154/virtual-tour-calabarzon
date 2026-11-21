@@ -5,7 +5,9 @@ import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import type { Category, Province } from '@/constants/taxonomy';
-import { colors, elevation, radius, spacing } from '@/theme';
+import { radius, spacing } from '@/theme';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type TagProps = {
   icon: IconName;
@@ -16,6 +18,7 @@ type TagProps = {
 
 /** A small, non-interactive pill that labels a destination. */
 export function Tag({ icon, label, tone = 'soft' }: TagProps) {
+  const styles = useStyles();
   return (
     <View style={[styles.tag, styles[tone]]}>
       <AppIcon name={icon} size="xs" color={tone === 'outline' ? 'primary' : 'secondaryDark'} />
@@ -27,14 +30,15 @@ export function Tag({ icon, label, tone = 'soft' }: TagProps) {
 }
 
 export function CategoryTag({ category, tone }: { category: Category; tone?: TagProps['tone'] }) {
-  return <Tag icon={CATEGORY_META[category].icon} label={category} tone={tone} />;
+  const { categoryLabel } = useI18n();
+  return <Tag icon={CATEGORY_META[category].icon} label={categoryLabel(category)} tone={tone} />;
 }
 
 export function ProvinceTag({ province, tone = 'outline' }: { province: Province; tone?: TagProps['tone'] }) {
   return <Tag icon="map-marker-outline" label={province} tone={tone} />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, elevation }) => ({
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -57,4 +61,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.outlineStrong,
   },
-});
+}));

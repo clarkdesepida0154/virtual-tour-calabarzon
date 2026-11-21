@@ -23,7 +23,7 @@ type Entry<T> = { savedAt: string; value: T };
 
 /** True when the failure means "no connection" (rather than a server or data error). */
 export function isOfflineError(error: unknown): boolean {
-  return toAppError(error, '').kind === 'network';
+  return toAppError(error, 'generic').kind === 'network';
 }
 
 export type OfflineCacheOptions = {

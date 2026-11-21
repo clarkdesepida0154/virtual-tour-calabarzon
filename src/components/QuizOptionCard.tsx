@@ -1,10 +1,12 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import type { IconName } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { colors, elevation, layout, radius, spacing } from '@/theme';
+import { layout, radius, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 import type { ColorToken } from '@/theme';
+import { useI18n } from '@/context/I18nContext';
 
 /**
  * - `idle`     before an answer is picked
@@ -41,10 +43,17 @@ const ICONS: Partial<Record<OptionState, IconName>> = {
 
 /** One answer on a quiz card. Locks and recolours itself once an answer is picked. */
 export function QuizOptionCard({ letter, text, state, picked, disabled, onPress }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const look = LOOK[state];
   const icon = ICONS[state];
   const status =
-    state === 'correct' ? (picked ? 'Your answer, correct.' : 'Correct answer.') : state === 'wrong' ? 'Your answer, incorrect.' : '';
+    state === 'correct'
+      ? t(picked ? 'quiz.optionYoursCorrect' : 'quiz.optionCorrect')
+      : state === 'wrong'
+        ? t('quiz.optionYoursWrong')
+        : '';
 
   return (
     <Pressable
@@ -52,7 +61,7 @@ export function QuizOptionCard({ letter, text, state, picked, disabled, onPress 
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: picked }}
-      accessibilityLabel={`Option ${letter}: ${text}. ${status}`}
+      accessibilityLabel={`${t('quiz.option', { letter, text })} ${status}`.trim()}
       android_ripple={disabled ? undefined : { color: colors.pressed }}
       style={({ pressed }) => [
         styles.card,
@@ -74,7 +83,7 @@ export function QuizOptionCard({ letter, text, state, picked, disabled, onPress 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ elevation }) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -104,4 +113,4 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
   },
-});
+}));

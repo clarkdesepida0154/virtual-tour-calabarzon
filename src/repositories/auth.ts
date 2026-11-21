@@ -6,8 +6,9 @@
  */
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
-import { AppError } from '@/lib/errors';
-import { friendlyAuthMessage } from '@/lib/authForm';
+import { AUTH_MESSAGE_PARAMS, friendlyAuthMessage } from '@/lib/authForm';
+import { AppError, toAppError } from '@/lib/errors';
+import type { ErrorContext } from '@/lib/errors';
 import type { Database } from '@/types/database';
 
 export type SignUpResult =
@@ -16,8 +17,11 @@ export type SignUpResult =
   /** Account created, but the email must be confirmed before signing in. */
   | { status: 'confirm-email'; email: string };
 
-function authError(error: unknown, fallback: string): AppError {
-  return new AppError('auth', friendlyAuthMessage(error, fallback), { cause: error });
+/** A recognised auth problem gets its own message; anything else the generic one. */
+function authError(error: unknown, fallback: ErrorContext): AppError {
+  const key = friendlyAuthMessage(error);
+  if (key) return new AppError('auth', key, { cause: error, params: AUTH_MESSAGE_PARAMS });
+  return toAppError(error, fallback);
 }
 
 export function createAuthRepository(client: SupabaseClient<Database>) {
@@ -39,7 +43,7 @@ export function createAuthRepository(client: SupabaseClient<Database>) {
       if (error) throw error;
       return data.session;
     } catch (cause) {
-      throw authError(cause, 'We couldn’t sign you in. Please try again.');
+      throw authError(cause, 'signIn');
     }
   }
 
@@ -51,13 +55,13 @@ export function createAuthRepository(client: SupabaseClient<Database>) {
       // With "Confirm email" on, Supabase returns a user but no session. It
       // also hides whether the address was already registered (no identities).
       if (data.user && data.user.identities && data.user.identities.length === 0) {
-        throw new AppError('auth', 'An account with this email already exists. Try signing in instead.');
+        throw new AppError('auth', 'auth.errors.userExists');
       }
       if (data.session) return { status: 'signed-in', session: data.session };
       return { status: 'confirm-email', email: trimmed };
     } catch (cause) {
       if (cause instanceof AppError) throw cause;
-      throw authError(cause, 'We couldn’t create your account. Please try again.');
+      throw authError(cause, 'createAccount');
     }
   }
 
@@ -65,7 +69,7 @@ export function createAuthRepository(client: SupabaseClient<Database>) {
     // 'local' clears this device's session even when the server can't be
     // reached, so signing out always works offline.
     const { error } = await client.auth.signOut({ scope: 'local' });
-    if (error) throw authError(error, 'We couldn’t sign you out. Please try again.');
+    if (error) throw authError(error, 'signOut');
   }
 
   return { getSession, onSessionChange, signIn, signUp, signOut };

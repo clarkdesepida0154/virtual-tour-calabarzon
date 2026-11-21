@@ -34,7 +34,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       })
       .select()
       .single();
-    if (error) throw toAppError(error, 'We couldn’t save your score.');
+    if (error) throw toAppError(error, 'saveScore');
     return data;
   }
 
@@ -49,10 +49,10 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
         { device_id: userKey, destination_id: destinationId },
         { onConflict: 'destination_id,device_id', ignoreDuplicates: true },
       );
-    if (error) throw toAppError(error, 'We couldn’t mark this destination as visited.');
+    if (error) throw toAppError(error, 'markVisited');
 
     const existing = await getCompletion(userKey, destinationId);
-    if (!existing) throw toAppError(new Error('missing row'), 'We couldn’t mark this destination as visited.');
+    if (!existing) throw toAppError(new Error('missing row'), 'markVisited');
     return existing;
   }
 
@@ -63,7 +63,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       .eq('device_id', userKey)
       .eq('destination_id', destinationId)
       .maybeSingle();
-    if (error) throw toAppError(error, 'We couldn’t load your progress.');
+    if (error) throw toAppError(error, 'loadProgress');
     return data;
   }
 
@@ -73,7 +73,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       .select('*')
       .eq('device_id', userKey)
       .order('completed_at', { ascending: false });
-    if (error) throw toAppError(error, 'We couldn’t load your progress.');
+    if (error) throw toAppError(error, 'loadProgress');
     return data;
   }
 
@@ -82,14 +82,14 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
     let query = client.from('quiz_attempts').select('*').eq('device_id', userKey);
     if (destinationId) query = query.eq('destination_id', destinationId);
     const { data, error } = await query.order('taken_at', { ascending: false });
-    if (error) throw toAppError(error, 'We couldn’t load your quiz scores.');
+    if (error) throw toAppError(error, 'loadScores');
     return data;
   }
 
   /** `id` + `destination_id` of every row a user key has in a unique-per-place table. */
   async function keyedRows(table: 'destination_completions' | 'favorites', userKey: string) {
     const { data, error } = await client.from(table).select('id, destination_id').eq('device_id', userKey);
-    if (error) throw toAppError(error, 'We couldn’t move your guest progress to your account.');
+    if (error) throw toAppError(error, 'transferProgress');
     return data;
   }
 
@@ -117,7 +117,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       duplicateFavorites.length > 0 ? client.from('favorites').delete().in('id', duplicateFavorites) : null,
     ]);
     const cleanupError = cleanup.find((result) => result?.error)?.error;
-    if (cleanupError) throw toAppError(cleanupError, 'We couldn’t move your guest progress to your account.');
+    if (cleanupError) throw toAppError(cleanupError, 'transferProgress');
 
     const moved = await Promise.all([
       client.from('destination_completions').update({ device_id: toKey }).eq('device_id', fromKey),
@@ -125,7 +125,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       client.from('favorites').update({ device_id: toKey }).eq('device_id', fromKey),
     ]);
     const error = moved.find((result) => result.error)?.error;
-    if (error) throw toAppError(error, 'We couldn’t move your guest progress to your account.');
+    if (error) throw toAppError(error, 'transferProgress');
   }
 
   /** Removes every progress row and favorite of one user key (used by the test scripts). */
@@ -136,7 +136,7 @@ export function createProgressRepository(client: SupabaseClient<Database>) {
       client.from('favorites').delete().eq('device_id', userKey),
     ]);
     const error = results.find((result) => result.error)?.error;
-    if (error) throw toAppError(error, 'We couldn’t clear the progress.');
+    if (error) throw toAppError(error, 'clearProgress');
   }
 
   return {

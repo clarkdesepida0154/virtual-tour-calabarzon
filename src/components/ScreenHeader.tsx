@@ -1,9 +1,12 @@
-import { StyleSheet, View } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import type { ReactNode } from 'react';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppIconButton } from '@/components/AppIconButton';
 import { AppText } from '@/components/AppText';
-import { colors, iconSize, layout, spacing } from '@/theme';
+import { iconSize, layout, spacing } from '@/theme';
+import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import { useI18n } from '@/context/I18nContext';
 
 type Props = {
   title: string;
@@ -14,25 +17,31 @@ type Props = {
   onBack?: () => void;
   /** Draws a hairline under the header; use when content scrolls beneath it. */
   divider?: boolean;
+  /** Shown at the top right, level with the title (e.g. a Settings button). */
+  action?: ReactNode;
 };
 
 /** Page title block that also clears the status bar / notch. */
-export function ScreenHeader({ title, overline, subtitle, onBack, divider = false }: Props) {
+export function ScreenHeader({ title, overline, subtitle, onBack, divider = false, action }: Props) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
   return (
     <View
       style={[styles.container, divider && styles.divider, { paddingTop: insets.top + spacing.md }]}>
       {onBack ? (
-        <IconButton
+        <AppIconButton
           icon="arrow-left"
           size={iconSize.md}
           iconColor={colors.ink}
           onPress={onBack}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           style={styles.back}
         />
       ) : null}
+      <View style={styles.titleRow}>
       <View style={styles.titles}>
         {overline ? (
           <AppText variant="overline" color="secondaryDark">
@@ -48,11 +57,13 @@ export function ScreenHeader({ title, overline, subtitle, onBack, divider = fals
           </AppText>
         ) : null}
       </View>
+      {action ? <View style={styles.action}>{action}</View> : null}
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.md,
@@ -67,7 +78,16 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: spacing.xs,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
   titles: {
+    flex: 1,
     gap: spacing.xs,
   },
-});
+  action: {
+    marginRight: -spacing.sm,
+  },
+}));
