@@ -18,6 +18,12 @@ Expo SDK 58 · React Native 0.88 · TypeScript (strict) · Supabase · Android &
     <td align="center"><img src="docs/screenshots/quiz.jpg" width="190" alt="Quiz with instant feedback"><br><sub>Quiz</sub></td>
     <td align="center"><img src="docs/screenshots/progress.jpg" width="190" alt="Progress tab with favorites"><br><sub>Progress & favorites</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/home-dark.jpg" width="190" alt="Home in the dark theme"><br><sub>Dark theme · Home</sub></td>
+    <td align="center"><img src="docs/screenshots/details-dark.jpg" width="190" alt="Destination details in the dark theme"><br><sub>Dark theme · Details</sub></td>
+    <td align="center"><img src="docs/screenshots/explore-filipino.jpg" width="190" alt="Explore with the Filipino interface"><br><sub>Filipino UI · Tuklasin</sub></td>
+    <td align="center"><img src="docs/screenshots/settings.jpg" width="190" alt="Settings: appearance, language and narration"><br><sub>Settings</sub></td>
+  </tr>
 </table>
 
 ## Why it exists
@@ -39,6 +45,10 @@ error states were treated as first-class requirements rather than polish.
 - **Guided virtual tour** — full-screen sequence: introduction → swipeable
   photo gallery (every photo credited) → History → Cultural Significance →
   completion. Steps without content are skipped; Android back steps back.
+- **Audio guide** — a *Listen* button on each chapter reads it aloud with
+  the phone's text-to-speech (Philippine or US English voice, normal or slow
+  speed) and stops by itself when you move on, close the tour or leave the
+  app.
 - **Quiz engine** — five questions per destination, options reshuffled on
   every attempt, instant right/wrong feedback, score ring, unlimited retakes,
   best score kept. Every question is answerable from the destination's own
@@ -51,8 +61,10 @@ error states were treated as first-class requirements rather than polish.
   sort nearest first. Distances are computed on the device (haversine); no
   location ever leaves the phone. Permission is requested through an in-app
   explanation first, and declining simply hides the feature.
-- **Map** — all 26 destinations on Google Maps, pins coloured by category, a
-  legend that doubles as a filter, callouts that open the destination.
+- **Map** — all 26 destinations on Google Maps with custom category pins
+  (colour + icon, the selected one grows), a chip legend with counts that
+  doubles as a filter, a matching dark map style, smooth fly-to camera moves
+  and callouts that open the destination.
 - **Get directions** — from a destination or the end of its tour, opens Google
   Maps with turn-by-turn directions from the current location (universal
   link, no API key; falls back to the browser when the app is not installed).
@@ -68,6 +80,21 @@ error states were treated as first-class requirements rather than polish.
   and password moves the guest's visits, scores and favorites to the account.
 
 **Feel**
+- **Light and dark themes** — System, Light or Dark in Settings, applied at
+  once across every screen, the map style and the status bar. The dark theme
+  keeps the museum palette on deep warm browns; the tour's dark gallery wall
+  is the same in both.
+- **English or Filipino interface** — every button, label, message and
+  screen-reader label in natural UI Filipino ("I-save", "Mga Paborito",
+  "Tuklasin"), switched instantly. Destination write-ups and quizzes stay in
+  English by design.
+- **Settings, About and Photo Credits** — appearance, language, narration,
+  app version and source link, and all 78 photo credits read live from the
+  database.
+- **Accessible by design** — every token pair checked against WCAG AA in
+  both themes, 44–48 dp touch targets, screen-reader labels and roles on
+  every control, quiz feedback by icon as well as colour, layouts verified at
+  1.3× text size.
 - **Works offline** — the last-fetched catalogue and destination pages are
   kept on the device; without a connection the app shows them with a quiet
   "Offline — showing saved data" banner instead of an error.
@@ -85,7 +112,7 @@ error states were treated as first-class requirements rather than polish.
 | App | [Expo](https://expo.dev) SDK 58, React Native 0.88, React 19 with the React Compiler, TypeScript in strict mode |
 | Navigation | Expo Router (file-based) — a root stack with protected route groups around four bottom tabs; typed routes |
 | UI | React Native Paper (Material Design 3) re-themed with custom tokens; Playfair Display + Inter; Reanimated for step transitions; react-native-svg for the progress ring |
-| Maps & device | react-native-maps (Google Maps on Android), expo-location, expo-haptics, expo-image (with disk cache), expo-image-picker / manipulator |
+| Maps & device | react-native-maps (Google Maps on Android), expo-location, expo-haptics, expo-speech, expo-image (with disk cache), expo-image-picker / manipulator |
 | Backend | [Supabase](https://supabase.com): Postgres with Row Level Security, Storage for photos, Auth (email + password) |
 | Local storage | AsyncStorage for the session, the guest key, one-time flags and the offline catalogue |
 | Tooling | ESLint (expo config), Node's built-in test runner via tsx, Playwright for the web click-through, EAS Build for the APK |
@@ -126,7 +153,14 @@ used, so the app can be opened on any phone by scanning a QR code.
   need a connection and say so.
 - **Design system.** All colours, type ramps, spacing (4/8 pt), radii, shadows
   and sizes live in `src/theme`; screens contain no literal colours or font
-  sizes. The palette — terracotta, heritage gold, warm cream — and the serif
+  sizes. Colours come from two palettes with identical keys (light and dark);
+  components build theme-aware styles with a small `makeStyles` hook, so a
+  theme switch re-renders with new tokens without restarting or losing the
+  navigation state.
+- **Internationalisation without a framework.** A typed dictionary per
+  language (`src/i18n`): keys are checked by TypeScript, plural forms and
+  placeholders are validated by `npm run i18n:check`, and pure modules return
+  message keys instead of English sentences. The palette — terracotta, heritage gold, warm cream — and the serif
   headings follow the look of a national museum's exhibit labels. Every screen
   has skeleton loading, a friendly empty state and an error state with retry;
   touch targets are at least 48 dp and font scaling is capped at 1.3×.
@@ -196,10 +230,11 @@ environment variables).
 
 | Suite | Command | What it covers | Checks |
 | --- | --- | --- | --- |
-| Unit | `npm test` | Quiz scoring and shuffling, best scores, progress statistics, auth validation, distances and sorting, favorites merge and transfer rules, offline cache, directions link, share text | 44 |
-| Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage upload, quiz rows, attempts, visits, favorites (idempotency, isolation, cascade), guest → account transfer. Cleans up after itself | 38 |
+| Unit | `npm test` | Quiz scoring and shuffling, best scores, progress statistics, auth validation, distances, favorites, offline cache, directions and share text, theme token completeness and WCAG contrast in both themes, i18n dictionaries and translator, narration state machine, settings parsing, photo credits | 73 |
+| Data layer (live) | `npm run db:test` | The app's repositories against the real project: search and filters, CRUD, storage upload, quiz rows, attempts, visits, favorites (idempotency, isolation, cascade), guest → account transfer, photo credits. Cleans up after itself | 39 |
 | Auth (live) | `npm run auth:test` | Sign-in and sign-out, signed-in RLS, progress under the auth user id, friendly errors, with a temporary user | 6 |
-| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build: onboarding, Welcome, guest, Near me, favorites, share, directions, tour, quiz, map, progress, offline banner, sign in / out, session restore | 94 |
+| End to end | `node scripts/web-clickthrough.mjs <web export>` | Headless Playwright walk through every flow of the web build: onboarding, Welcome, guest, Near me, favorites, share, directions, tour with narration, quiz, map, progress, offline banner, Settings, dark mode (background sampled on five screens), Filipino UI, Photo Credits, sign in / out, session restore | 134 |
+| Languages | `npm run i18n:check` | 490 keys in English and Filipino: same keys, placeholders and plural forms, no empty text, and no hard-coded UI text left in screens or components | — |
 | Dataset | `npm run data:check` | Schema of the content file, and that every quiz answer appears in its destination's text | — |
 | Database | `npm run db:verify` | Tables, RLS policies, the 26 destinations, 78 photos and 130 questions, live photo links | — |
 | Static | `npm run typecheck` · `npm run lint` · `npx expo-doctor` | Strict TypeScript, ESLint, 20 Expo project checks | — |
@@ -239,13 +274,11 @@ tests/                 Unit tests
 
 ## Roadmap
 
-- **Dark mode** — the tokens are already centralised; a second palette and a
-  system-theme switch are the remaining work.
-- **English / Filipino** — move UI strings and dataset texts to a translation
-  layer and add Filipino versions of the 26 entries.
+- **Filipino content** — translate the 26 write-ups and their quizzes (the
+  interface is already bilingual; the dictionary and quiz pipeline are ready).
 - **Google Play release** — signed AAB, store listing, and the production RLS
   policies described in `schema.sql`.
-- Audio narration for each tour chapter, and more destinations per province.
+- Recorded narration by a human guide, and more destinations per province.
 
 ## Known limitations
 

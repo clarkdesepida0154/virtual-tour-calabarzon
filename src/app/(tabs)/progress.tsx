@@ -149,7 +149,7 @@ function IdentityCard() {
               label={t('progress.createAccount')}
               icon="account-plus-outline"
               onPress={() => router.push('/sign-up')}
-              style={styles.flex}
+              style={styles.nudgeButton}
             />
             <AppButton label={t('progress.signIn')} variant="text" onPress={() => router.push('/sign-in')} />
           </View>
@@ -478,8 +478,13 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
   },
   nudgeActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  // Grows to fill the row, and wraps "Sign in" below it when the text is large.
+  nudgeButton: {
+    flexGrow: 1,
   },
   // Overview
   overview: {
@@ -497,7 +502,8 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
   },
   overviewText: {
     flex: 1,
-    minWidth: layout.featuredCardWidth / 2,
+    // Wide enough that "4% of CALABARZON" moves under the ring instead of breaking mid-word.
+    minWidth: layout.overviewTextMinWidth,
     gap: spacing.xs,
   },
   stats: {

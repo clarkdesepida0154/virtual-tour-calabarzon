@@ -38,11 +38,16 @@ export function SegmentedChoice<T extends string>({ label, choices, value, onCha
             accessibilityRole="radio"
             accessibilityState={{ checked: selected, selected }}
             accessibilityLabel={choice.label}
-            style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.option,
+              choice.icon && styles.optionStacked,
+              selected && styles.optionSelected,
+              pressed && styles.pressed,
+            ]}>
             {choice.icon ? (
               <AppIcon name={choice.icon} size="sm" color={selected ? 'onPrimary' : 'inkSoft'} />
             ) : null}
-            <AppText variant="label" color={selected ? 'onPrimary' : 'ink'} numberOfLines={1}>
+            <AppText variant="label" color={selected ? 'onPrimary' : 'ink'} numberOfLines={1} align="center">
               {choice.label}
             </AppText>
           </Pressable>
@@ -57,7 +62,7 @@ const useStyles = makeStyles(({ colors }) => ({
     flexDirection: 'row',
     gap: spacing.xs,
     padding: spacing.xs,
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     backgroundColor: colors.surfaceMuted,
   },
   option: {
@@ -69,6 +74,13 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.pill,
+  },
+  // Icon above the label: three options keep their full words even with large text.
+  optionStacked: {
+    flexDirection: 'column',
+    gap: 0,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.lg,
   },
   optionSelected: {
     backgroundColor: colors.primary,

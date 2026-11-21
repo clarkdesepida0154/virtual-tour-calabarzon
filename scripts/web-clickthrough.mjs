@@ -15,7 +15,12 @@
  * → sign out → session persistence, then a second fresh browser for Skip,
  * "Not now" and a refused location permission. It prints one line per check.
  * Share and "Get directions" are captured by stubbing navigator.share and
- * window.open (a headless browser has no share sheet or Maps app). Signing in uses a confirmed throwaway user created directly
+ * window.open (a headless browser has no share sheet or Maps app).
+ *
+ * Run 5 adds: narration (window.speechSynthesis is stubbed with one en-US
+ * voice — no audio is produced), Settings, dark mode (the page background is
+ * sampled from screenshots on five screens), the Filipino UI (known strings
+ * asserted) and Photo Credits. The original flows run first, unchanged. Signing in uses a confirmed throwaway user created directly
  * in auth.users through SUPABASE_DB_URL (setup-script privilege). Every
  * progress row and the test user are deleted at the end, also on failure.
  *
@@ -38,6 +43,7 @@ mkdirSync(SHOTS, { recursive: true });
 const require = createRequire(join(PROJECT, 'package.json'));
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { connect } = require(join(PROJECT, 'scripts/lib/db.js'));
+const appVersion = require(join(PROJECT, 'app.json')).expo.version;
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.ttf': 'font/ttf', '.ico': 'image/x-icon', '.json': 'application/json' };
 const server = createServer((req, res) => {
@@ -115,6 +121,39 @@ const CAPTURE_OUTBOUND = () => {
     window.__opened.push(String(url));
     return null;
   };
+  // A fake text-to-speech engine with one English voice, so the narration
+  // button appears and its Listen / Stop cycle can be driven.
+  window.__spoken = [];
+  window.__cancelled = 0;
+  let current = null;
+  const voice = { lang: 'en-US', name: 'Test voice', voiceURI: 'test-en-us', localService: true, default: true };
+  Object.defineProperty(window, 'speechSynthesis', {
+    configurable: true,
+    value: {
+      speaking: false,
+      pending: false,
+      paused: false,
+      onvoiceschanged: null,
+      getVoices: () => [voice],
+      speak(utterance) {
+        current = utterance;
+        window.__spoken.push(utterance.text);
+        this.speaking = true;
+        setTimeout(() => utterance.onstart?.(new Event('start')), 30);
+      },
+      cancel() {
+        window.__cancelled += 1;
+        this.speaking = false;
+        const ending = current;
+        current = null;
+        if (ending) setTimeout(() => ending.onend?.(new Event('end')), 0);
+      },
+      pause() {},
+      resume() {},
+      addEventListener() {},
+      removeEventListener() {},
+    },
+  });
 };
 const context = await browser.newContext({ viewport: { width: 412, height: 915 }, geolocation: CALAMBA });
 await context.addInitScript(CAPTURE_OUTBOUND);
@@ -164,11 +203,26 @@ try {
   await shot(page, 'sign-in-validation');
   await page.getByLabel('Go back').filter({ visible: true }).first().click();
 
+  // A confirmed throwaway account (created directly in auth.users). Sign-up
+  // with its address must be refused by Supabase whether or not "Confirm
+  // email" is on; sign-in uses it later.
+  const created = await db.query(
+    `insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+       raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+       confirmation_token, recovery_token, email_change_token_new, email_change)
+     values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
+       $1, extensions.crypt($2, extensions.gen_salt('bf')), now(),
+       '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '')
+     returning id`,
+    [EMAIL, PASSWORD],
+  );
+  testUserId = created.rows[0].id;
+
   // 3. Sign up: validation and a server error banner
   await text(page, 'Create an account').first().click();
   await expectVisible(page, text(page, 'Create an Account'), 'Sign Up screen opens');
   const fields = page.locator('input:visible');
-  await fields.nth(0).fill('someone@example.com');
+  await fields.nth(0).fill(EMAIL);
   await fields.nth(1).fill('short');
   await fields.nth(2).fill('different');
   await page.getByRole('button', { name: /Create account/ }).click();
@@ -292,10 +346,26 @@ try {
   await shot(page, 'tour-gallery-2');
   await text(page, 'Continue').click();
   await expectVisible(page, text(page, 'Chapter I'), 'Tour: History chapter');
-  await page.waitForTimeout(1200);
+  // Narration (museum audio guide)
+  const listen = page.getByRole('button', { name: 'Listen to this chapter read aloud' }).filter({ visible: true });
+  await expectVisible(page, listen, 'Narration: Listen button on the History chapter');
+  await listen.first().click();
+  await expectVisible(page, page.getByRole('button', { name: 'Stop the narration' }), 'Narration: turns into Stop while reading');
+  const spoken = await page.evaluate(() => window.__spoken.at(-1) ?? '');
+  results.push(/^History\. /.test(spoken) && spoken.length > 200 ? `ok    Narration: reads the chapter (${spoken.length} characters)` : `FAIL  narration text: ${spoken.slice(0, 60)}`);
+  await page.waitForTimeout(500);
+  await shot(page, 'tour-history-narrating');
+  await page.getByRole('button', { name: 'Stop the narration' }).filter({ visible: true }).first().click();
+  await expectVisible(page, listen, 'Narration: Stop returns to Listen');
+  await listen.first().click();
+  await page.waitForTimeout(300);
+  const cancelledBefore = await page.evaluate(() => window.__cancelled);
+  await page.waitForTimeout(900);
   await shot(page, 'tour-history');
   await text(page, 'Continue').click();
   await expectVisible(page, text(page, 'Cultural Significance'), 'Tour: Cultural Significance chapter');
+  const cancelledAfter = await page.evaluate(() => window.__cancelled);
+  results.push(cancelledAfter > cancelledBefore ? 'ok    Narration: leaving the step stops the reading' : 'FAIL  narration kept going after leaving the step');
   await page.waitForTimeout(800);
   await shot(page, 'tour-culture');
   await page.getByLabel('Previous step').click();
@@ -413,19 +483,122 @@ try {
   results.push(bannerGone ? 'ok    Offline: Retry after reconnecting hides the banner' : 'FAIL  banner still shown online');
   await page.getByRole('button', { name: /^Nature filter$/ }).first().click();
 
+  // 11c. Settings: dark mode, Filipino, Photo Credits — then back to the defaults
+  const sharp = require('sharp');
+  /** Average colour of a strip down the left edge of the screen (the page background). */
+  const backgroundOf = async (target) => {
+    const image = await target.screenshot({ clip: { x: 2, y: 420, width: 6, height: 40 } });
+    const { data } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let i = 0; i < data.length; i += 3) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+    }
+    const n = data.length / 3;
+    return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n), luminance: (0.2126 * r + 0.7152 * g + 0.0722 * b) / n };
+  };
+  const openSettings = async () => {
+    await page.getByRole('tab', { name: /Progress|Progreso/ }).click();
+    await page.waitForTimeout(400);
+    // Home's gear stays mounted behind the Progress tab: click the one that can be clicked.
+    await clickActionable(page.getByLabel(/^(Open settings|Buksan ang mga setting)$/).filter({ visible: true }));
+  };
+
+  await openSettings();
+  await expectVisible(page, page.getByRole('heading', { name: 'Settings' }), 'Settings: opens from the Progress gear');
+  for (const section of ['Appearance', 'Language', 'Narration', 'About', 'Legal']) {
+    await expectVisible(page, page.getByRole('heading', { name: section }), `Settings: ${section} section`);
+  }
+  await expectVisible(page, text(page, `Version ${appVersion}`), `Settings: shows the app version from the app config (${appVersion})`);
+  await expectVisible(page, text(page, 'Destination write-ups and quizzes stay in English.'), 'Settings: content-stays-English note');
+  const lightBg = await backgroundOf(page);
+  await page.waitForTimeout(600);
+  await shot(page, 'settings-light');
+
+  // Photo Credits (live captions)
+  await page.getByRole('button', { name: 'Photo credits' }).filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Photo Credits' }), 'Credits: Photo Credits screen opens');
+  await expectVisible(page, text(page, '78 photographs'), 'Credits: counts all 78 photographs');
+  await expectVisible(page, text(page, /Wikimedia Commons and is used under/, false), 'Credits: Commons framing sentence on top');
+  const creditLines = await text(page, /^Photo: .+via Wikimedia Commons$/, false).count();
+  results.push(creditLines >= 9 ? `ok    Credits: credit lines rendered (${creditLines} in view)` : `FAIL  only ${creditLines} credit lines`);
+  await page.waitForTimeout(600);
+  await shot(page, 'credits');
+  await page.getByLabel('Go back').filter({ visible: true }).first().click();
+
+  // Dark mode, applied instantly
+  await page.getByRole('radio', { name: 'Dark' }).click();
+  await page.waitForTimeout(500);
+  const darkBg = await backgroundOf(page);
+  results.push(
+    darkBg.luminance < 40 && lightBg.luminance > 200
+      ? `ok    Dark mode: Settings background ${JSON.stringify(lightBg).slice(0, 30)}… → rgb(${darkBg.r},${darkBg.g},${darkBg.b})`
+      : `FAIL  dark mode background light ${lightBg.luminance.toFixed(0)} → dark ${darkBg.luminance.toFixed(0)}`,
+  );
+  results.push(darkBg.r > darkBg.b ? 'ok    Dark mode: warm dark (not pure black / not blue-grey)' : `FAIL  dark background not warm: ${JSON.stringify(darkBg)}`);
+  await shot(page, 'settings-dark');
+  await page.getByLabel('Go back').filter({ visible: true }).first().click();
+  for (const [tab, name] of [['Home', 'home-dark'], ['Explore', 'explore-dark'], ['Map', 'map-dark'], ['Progress', 'progress-dark']]) {
+    await page.getByRole('tab', { name: new RegExp(tab) }).click();
+    await page.waitForTimeout(1500);
+    const bg = await backgroundOf(page);
+    results.push(bg.luminance < 60 ? `ok    Dark mode: ${tab} renders dark (luminance ${bg.luminance.toFixed(0)})` : `FAIL  ${tab} not dark (luminance ${bg.luminance.toFixed(0)})`);
+    await shot(page, name);
+  }
+  await page.getByRole('tab', { name: /Explore/ }).click();
+  await page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Start Virtual Tour'), 'Dark mode: Details opens');
+  await page.waitForTimeout(1500);
+  await shot(page, 'details-dark');
+  await text(page, 'Start Virtual Tour').filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'A virtual tour'), 'Dark mode: tour opens on the gallery wall');
+  await page.waitForTimeout(1200);
+  await shot(page, 'tour-dark');
+  await page.getByLabel('Close the tour').click();
+  await page.getByLabel('Go back').filter({ visible: true }).first().click();
+
+  // Filipino UI, applied instantly
+  await openSettings();
+  await page.getByRole('radio', { name: 'Filipino' }).click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Mga Setting' }), 'Filipino: Settings heading switches to "Mga Setting"');
+  await expectVisible(page, page.getByRole('heading', { name: 'Itsura' }), 'Filipino: section titles translated (Itsura)');
+  await expectVisible(page, text(page, 'Nananatiling English ang mga paglalarawan ng destinasyon at ang mga quiz.'), 'Filipino: content note translated');
+  await shot(page, 'settings-fil');
+  await page.getByLabel('Bumalik').filter({ visible: true }).first().click();
+  await expectVisible(page, page.getByRole('tab', { name: /Tuklasin/ }), 'Filipino: tab bar says Tuklasin / Progreso');
+  await expectVisible(page, page.getByRole('heading', { name: 'Progreso' }), 'Filipino: Progress title is "Progreso"');
+  await expectVisible(page, page.getByRole('heading', { name: 'Mga Paborito' }), 'Filipino: Favorites section is "Mga Paborito"');
+  await page.getByRole('tab', { name: /Tuklasin/ }).click();
+  await expectVisible(page, text(page, 'Kategorya'), 'Filipino: Explore filter label "Kategorya"');
+  await expectVisible(page, text(page, '26 destinasyon'), 'Filipino: result count "26 destinasyon"');
+  await expectVisible(page, page.getByRole('button', { name: /Pinakamalapit muna/ }), 'Filipino: "Pinakamalapit muna" sort chip');
+  await page.waitForTimeout(1200);
+  await shot(page, 'explore-fil');
+  await page.getByRole('button', { name: /^Aguinaldo Shrine,/ }).filter({ visible: true }).first().click();
+  await expectVisible(page, text(page, 'Simulan ang Tour'), 'Filipino: Details action "Simulan ang Tour"');
+  await expectVisible(page, page.getByRole('heading', { name: 'Kasaysayan' }), 'Filipino: History section is "Kasaysayan"');
+  const englishContent = await text(page, /ancestral home of General Emilio Aguinaldo/, false).count();
+  results.push(englishContent > 0 ? 'ok    Filipino: destination write-up stays English (by design)' : 'FAIL  destination content missing');
+  await page.waitForTimeout(1000);
+  await shot(page, 'details-fil');
+  await page.getByLabel('Bumalik').filter({ visible: true }).first().click();
+
+  // Back to the defaults (English, Light) for the remaining flows
+  await openSettings();
+  await page.getByRole('radio', { name: 'English' }).click();
+  await page.getByRole('radio', { name: 'Light' }).click();
+  await expectVisible(page, page.getByRole('heading', { name: 'Settings' }), 'Settings: back to English');
+  const restoredBg = await backgroundOf(page);
+  results.push(restoredBg.luminance > 200 ? 'ok    Settings: back to the light theme' : 'FAIL  light theme not restored');
+  const saved = await page.evaluate(() => localStorage.getItem('vtour.preferences'));
+  results.push(/"theme":"light"/.test(saved ?? '') && /"locale":"en"/.test(saved ?? '') ? 'ok    Settings: choices saved on the device' : `FAIL  saved preferences: ${saved}`);
+  await page.getByLabel('Go back').filter({ visible: true }).first().click();
+
   // 12. Sign in from the Progress tab with a confirmed throwaway user
   await page.getByRole('tab', { name: /Progress/ }).click();
-  const created = await db.query(
-    `insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-       raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-       confirmation_token, recovery_token, email_change_token_new, email_change)
-     values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
-       $1, extensions.crypt($2, extensions.gen_salt('bf')), now(),
-       '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '')
-     returning id`,
-    [EMAIL, PASSWORD],
-  );
-  testUserId = created.rows[0].id;
   await page.mouse.wheel(0, -2000);
   await page.getByRole('button', { name: /^Sign in$/ }).first().click();
   await page.locator('input:visible').nth(0).fill(EMAIL);
@@ -447,7 +620,8 @@ try {
   await shot(page, 'after-sign-out');
 
   // 14. Reload: session persistence (sign in again, reload, still signed in)
-  await text(page, 'Sign in').first().click();
+  await page.waitForTimeout(400);
+  await clickActionable(text(page, 'Sign in').filter({ visible: true }));
   await page.locator('input:visible').nth(0).fill(EMAIL);
   await page.locator('input:visible').nth(1).fill(PASSWORD);
   await page.getByRole('button', { name: /^Sign in$/ }).last().click();
@@ -494,6 +668,8 @@ try {
     await db.query('delete from public.favorites where device_id = $1', [key]);
   }
   if (testUserId) await db.query('delete from auth.users where id = $1', [testUserId]);
+  // Never leave an account behind, even if a sign-up unexpectedly succeeded.
+  await db.query("delete from auth.users where email = $1 or email = 'someone@example.com'", [EMAIL]);
   const left = await db.query(
     `select (select count(*) from public.quiz_attempts)::int a, (select count(*) from public.destination_completions)::int c,
             (select count(*) from public.favorites)::int f, (select count(*) from auth.users)::int u`,

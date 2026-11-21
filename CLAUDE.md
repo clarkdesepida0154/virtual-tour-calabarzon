@@ -123,6 +123,42 @@ Screens:
    Shown only on a true first launch (no session, no guest choice); existing
    users are marked as having seen it.
 
+### Run 5 — platform pass (built)
+
+1. **Dark mode** — Settings → Appearance: System / Light / Dark (default
+   System). Instant, app-wide (Paper, navigation, map styles, status bars,
+   window background via expo-system-ui). See Design system.
+2. **Filipino / English UI** — Settings → Language. Instant, no restart.
+   See Languages.
+3. **Settings** (`src/app/settings.tsx`, gear in the Home hero and the
+   Progress header): Appearance, Language (+ "content stays English"),
+   Narration (show the Listen button; speed Normal / Slow), About (version
+   from the app config — app.json on web — WMA 306 line, GitHub link),
+   Legal (Photo credits, open-source note). All saved as one AsyncStorage
+   value (`vtour.preferences`, `PreferencesContext`, parsed by
+   `src/lib/preferences.ts`) and read before the splash hides.
+4. **Photo Credits** (`src/app/credits.tsx`) — all 78 credit lines, live from
+   `destination_images.caption` (`destinationImagesRepository.listAll()`,
+   grouped by `groupCredits()`), Commons framing sentence on top.
+5. **Narration** — `<NarrationButton>` on the History and Cultural
+   Significance chapters: expo-speech reads "<title>. <chapter>" in en-PH /
+   en-US (`pickSpeechLanguage`), rate from Settings, icon swap + pulse,
+   light haptic. State machine in `src/lib/narration.ts` (utterance ids ignore
+   late callbacks); `useNarration` stops on step change, tour close and app
+   background, and hides the button when no English voice answers within
+   2 s (also on web without voices).
+6. **Map** — custom `<MapPin>` markers (category colour + icon, `pinRim`
+   rim, grows when selected). Each marker sets `tracksViewChanges` only for
+   `motion.markerSettle` (400 ms) after mount / (de)selection / theme change,
+   then freezes. Chip-style legend with icons and counts; dark map style;
+   preview card with category chip, outline and entrance animation; the
+   Details lite-mode preview remounts per theme. Camera moves were already
+   `animateToRegion` (Run 3).
+7. **Accessibility** — `AppIconButton`, 44 dp chips, contrast audit (5 light
+   pairs fixed), large-font layout fixes (Details action bar stacks at
+   fontScale ≥ 1.15, Progress nudge wraps, segmented options stack icon over
+   label).
+
 ### Identity model ("user key")
 
 No schema change: the text column `device_id` on `quiz_attempts` and
@@ -150,8 +186,8 @@ choice is remembered, so guests are not shown Welcome on every launch.
 - **@react-native-async-storage/async-storage** (session + device id +
   offline cache), **react-native-maps** (Map tab), **react-native-svg**
   (progress ring), **expo-crypto** (device UUID), **react-native-reanimated**
-  (step transitions), **expo-location** (Near me), **expo-haptics** — all
-  included in Expo Go.
+  (step transitions), **expo-location** (Near me), **expo-haptics**,
+  **expo-speech** (narration) — all included in Expo Go.
 - **react-native-paper** (Material Design 3) with the custom theme below.
 - **@supabase/supabase-js** for all data.
 - **expo-image** for all image rendering; **expo-image-picker** +
@@ -160,36 +196,87 @@ choice is remembered, so guests are not shown Welcome on every launch.
 
 ## Design system
 
-Heritage-museum aesthetic. Light theme only. Everything lives in
-`src/theme/index.ts` and is consumed everywhere — **zero ad-hoc colours or font
-sizes inside screens or components**.
+Heritage-museum aesthetic, in a **light and a dark theme** (Run 5). **Zero
+ad-hoc colours or font sizes inside screens or components** — the colour
+sweep (`grep` for `#…` / `rgba(` outside `src/theme`) must stay empty.
 
-| Token | Value |
+Where things live:
+
+| File | Holds |
 | --- | --- |
-| primary (terracotta) | `#9A3B26` |
-| secondary (heritage gold) | `#C9A227` |
-| background (warm cream) | `#FAF6EF` |
-| surface | `#FFFFFF` |
-| ink (text) | `#2A2420` |
-| success (forest) | `#2F5D46` |
-| muted | `#8A8178` |
+| `src/theme/palettes.ts` | `lightPalette` and `darkPalette` — the same keys (type `Palette`). Add a token to BOTH. |
+| `src/theme/index.ts` | Static tokens (spacing, radius, iconSize, layout, motion, fonts, typography) + `buildTheme()` → `THEMES.light / .dark` (colours, elevation, map style, Paper theme, navigation theme, status-bar style). |
+| `src/theme/ThemeProvider.tsx` | `AppThemeProvider`, `useAppTheme()`, `makeStyles()`. |
+| `src/theme/mapStyles.ts` | `lightMapStyle` (warm parchment) and `darkMapStyle` (night gallery). |
+| `src/theme/contrast.ts`, `contrastPairs.ts` | WCAG maths and every text/icon token pair with its AA minimum — unit-tested for both palettes. |
 
-The theme derives a few extra shades from these (soft tints for containers,
-`secondaryDark` for gold text that must stay readable on cream, outlines,
-photo scrims). Add new shades there, never inline.
+Styles: never `StyleSheet.create` at module level with colours. Write
 
-- **Typography** — Playfair Display (`@expo-google-fonts/playfair-display`) for
-  screen titles and destination names; Inter (`@expo-google-fonts/inter`) for
-  body. Use `<AppText variant="…">`; variants are defined in `typography`.
+```ts
+const useStyles = makeStyles(({ colors, elevation }) => ({ card: { backgroundColor: colors.surface, ...elevation.card } }));
+function Card() { const styles = useStyles(); … }
+```
+
+and read colours in components with `const { colors } = useAppTheme();`.
+The sheet is built once per theme and cached. Status bars: `<ThemedStatusBar />`
+(`overDark` over photos, the hero band or the exhibit wall).
+
+Core values (light / dark):
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| primary (terracotta) | `#9A3B26` | `#E8957C` (filled buttons get dark `onPrimary` text, as in M3) |
+| secondary (heritage gold) | `#C9A227` | `#D8B550` |
+| background | `#FAF6EF` cream | `#16110E` deep warm brown (never pure black) |
+| surface | `#FFFFFF` | `#221B17` |
+| ink | `#2A2420` | `#F2EAE0` |
+| muted | `#6E655D` (was `#8A8178`, failed AA) | `#A99D92` |
+| success | `#2F5D46` | `#8CC7A6` |
+
+Semantic tokens to know:
+
+- `onPrimary` = text ON a terracotta fill only. Text over photos, the hero
+  band and the exhibit wall uses **`onPhoto` / `onPhotoMuted`** (always white).
+- **Design constants, identical in both themes:** `exhibit`, `onExhibit*`,
+  `glass`, `onPhoto*`, `photoShade*` — the tour's dark "gallery wall" stays
+  itself in light and dark.
+- Home hero: `heroBackground`, `heroWatermark`, `heroAccent`.
+- Map pins: `category*` (distinct hues), `pinRim` (white on the light map,
+  deep brown on the dark map).
+
+- **Typography** — Playfair Display for screen titles and destination names;
+  Inter for body. `<AppText variant="…">`; variants in `typography`.
 - **Spacing** — 4/8pt scale: `spacing.xs` 4 … `spacing.huge` 64.
 - **Shape** — 12px card radius (`radius.md`), soft warm shadows
-  (`elevation.card` / `raised`).
-- **Every screen** has a loading state (skeletons or spinner), a friendly empty
-  state, and an error state with retry (`StateViews.tsx`, `Skeleton.tsx`).
-- **Icons** — Material Community Icons through `<AppIcon>` (token sizes and
-  colours).
-- **Accessibility** — touch targets ≥ 48dp, labels and roles on pressables,
-  font scaling capped at 1.3×.
+  (`elevation.card` / `raised` — deeper on dark).
+- **Every screen** has a loading state, a friendly empty state, and an error
+  state with retry (`StateViews.tsx`, `Skeleton.tsx`).
+- **Icons** — Material Community Icons through `<AppIcon>`; icon buttons
+  through **`<AppIconButton>`** (48 dp box, 44 dp `compact`) — never Paper's
+  `IconButton` directly (its box is only 34–38 dp).
+- **Accessibility** — touch targets ≥ 44 dp (48 dp default; chips 44 dp),
+  labels and roles on every pressable, font scaling capped at 1.3× (layouts
+  checked at 1.3× on a 360 dp screen in Run 5), quiz feedback = colour + icon.
+
+### Languages (Run 5)
+
+- `src/i18n/en.ts` is the source of truth (490 keys); `src/i18n/fil.ts` has
+  the same shape (`DictionaryShape<…>`, so a missing key is a type error).
+  Filipino = everyday Taglish UI Filipino ("I-save", "Mga Paborito",
+  "Tuklasin"); proper nouns stay.
+- In components: `const { t, categoryLabel, provinceTagline, errorMessage,
+  errorTitle, date, distance } = useI18n();` — `t('explore.count', { count })`.
+  Keys are type-checked; `{{placeholders}}`; `{ one, other }` plurals.
+- Pure modules never return English sentences for the UI: validation and
+  auth helpers return **keys**; `AppError` carries `contextKey` (its
+  `.message` stays English for scripts/logs) — show errors with
+  `errorMessage(error)`. Category values stay English in the database;
+  their labels come from `categories.<slug>` (`CATEGORY_KEYS`).
+- **Destination content (write-ups, quizzes) stays English by design**
+  (a note under Settings → Language says so).
+- `npm run i18n:check` must pass: same keys / placeholders / plural shape in
+  both languages, no empty text, and a sweep of `src/app` + `src/components`
+  for hard-coded UI text outside `t()` (small allowlist with reasons).
 
 ## Database
 
@@ -341,13 +428,14 @@ the direct host is IPv6-only and does not.
 | `npm run db:setup` | **Full reset.** Runs `schema.sql` (drop + create), then seeds the real 26-destination dataset, then verifies. |
 | `npm run db:migrate` | Runs every file in `supabase/migrations/` (idempotent, one transaction each) against the live DB, and fails if existing destination / attempt / visit counts change. Use this — not `db:setup` — for additive schema changes. |
 | `npm run db:sync-photos` | **Non-destructive photo top-up**: uploads the processed photos and updates only `cover_image_url` and the `destination_images` URLs / captions by stable id. Use it after replacing photos so live progress and favorites survive (unlike `db:seed`). |
+| `npm run i18n:check` | `scripts/i18n-check.ts`: en/fil dictionaries match (keys, placeholders, plurals, no empty text) and no hard-coded UI text in `src/app` / `src/components`. Run 5: 490 keys, clean. |
 | `npm run secrets:check` | Secret scan before any push: `.env` ignored and never committed; DB password (raw / URL-encoded), `sb_secret`, credentialed connection strings and Google keys absent from every tracked file and every commit. Prints counts only. |
 | `npm run db:seed` | Re-seeds the dataset only (`scripts/seed-full-dataset.js`): uploads the photos, then in one transaction deletes every destination and inserts the 26, then removes unused files from the bucket. Idempotent. |
 | `npm run db:verify` | Read-only check: 6 tables with RLS, exactly the 26 dataset destinations, each with a cover, 3 photo rows and 5 sound questions, no placeholder URLs, 5 random photo links return 200. |
 | `npm run db:test` | `scripts/verify-crud.mjs` (via `tsx`): exercises the app's real repositories against the live project with the publishable key — reads, search + filters, Featured selection, quiz and photo rows, upload, create / update / delete, and (Run 3) the quiz repository, quiz attempts, best score, idempotent "visited", per-key isolation, the Progress summary and guest → account transfer under a throwaway user key. Cleans up after itself. |
 | `npm test` | Unit tests (`tests/*.test.ts`, Node's test runner via `tsx`): quiz scorer, shuffling, result tone, best scores, progress summary, auth validation and error messages, text and map helpers. |
 | `npm run auth:test` | `scripts/verify-auth.mjs`: live auth check (settings, sign-up behaviour, sign-in, RLS for signed-in users, progress under the auth user id, wrong password, sign-out). Creates and deletes a throwaway user. |
-| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94 (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
+| `node scripts/web-clickthrough.mjs <dist>` | Headless Playwright click-through of every flow on the exported web build (`npx expo export --platform web --output-dir <dist>`). Playwright is not a dependency: set `PLAYWRIGHT_MODULE` (and `PLAYWRIGHT_CHROMIUM` if its browser build is missing). Run 3: 59/59; Run 4: 94/94; Run 5: 134/134 (adds narration with a stubbed `speechSynthesis`, Settings, dark mode verified by sampling the page background on five screens, Filipino strings, Photo Credits; the sign-up refusal now uses the pre-created account's address, so it works whether "Confirm email" is on or off). Run 4 added (adds onboarding, Near me with a fake Calamba position, favorites, share / directions captured by stubbing `navigator.share` / `window.open`, offline via `context.setOffline`, a second fresh browser for Skip / Not now / refused permission). Cleans up its rows and test user. Playwright lives in the npx cache (`…/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright`); its expected browser build is missing, so point `PLAYWRIGHT_CHROMIUM` at `…/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-win64/chrome-headless-shell.exe`. |
 | `npm run data:check` | Offline validation of the JSON, including "every quiz answer is in the text". |
 | `npm run images:fetch` | Downloads + processes photos named in the JSON that are missing from `data/images` (`-- --force` to redo). |
 | `npm run images:find` | Curation helper: contact sheet of usable Commons photos for a category / search. |
@@ -544,6 +632,23 @@ assets/                Icons, splash emblem (sources in assets/brand)
 - `npx expo prebuild` (useful to inspect the generated Gradle files) rewrites
   the `android` / `ios` npm scripts to `expo run:*` — restore them to
   `expo start --android/--ios`, and delete the generated `android/`.
+- **Theme switching**: styles are per-theme objects from `makeStyles`; a
+  Google Maps lite-mode `MapView` does not restyle in place — give it
+  `key={scheme}`.
+- **expo-constants on web** has no manifest in a static export
+  (`process.env.APP_MANIFEST` is empty): read the version as
+  `Constants.expoConfig?.version ?? appJson.expo.version`, never a literal.
+- **expo-speech on web** waits forever for `voiceschanged` when the browser
+  has no voices — always race `getAvailableVoicesAsync()` against a timeout.
+- **Typed i18n keys**: dynamic keys need template literals the type system
+  can check (`` t(`onboarding.slides.${slide.key}.title`) `` with a union-typed
+  `key`).
+- Web click-through: tabs and stack screens stay mounted, so a label can
+  match a hidden twin (e.g. Home's gear behind Progress) — use
+  `clickActionable()`.
+- With "Confirm email" OFF, a sign-up in a test really creates an account —
+  tests must never sign up with a fresh address (use the pre-created one,
+  and clean up by email).
 - `eas credentials` is interactive only. The keystore fingerprints come from
   the Expo GraphQL API (`androidAppBuildCredentialsList → androidKeystore →
   sha1CertificateFingerprint`); the APK is v2-signed only, so JRE 8's
@@ -613,17 +718,34 @@ Run 4
 - [x] Device check by the owner on Android and iOS (Runs 1–3 features)
 - [x] EAS APK v1.0.0 (preview profile, `com.clark0154.virtualtour`, EAS-managed keystore SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`) attached to GitHub Release v1.0.0
 - [x] Run 4.1: v1.0.0 launch crash fixed (R8 off + keep rules) → v1.0.1 (versionCode 2) on GitHub Releases
-- [ ] Owner: turn OFF "Confirm email" in the Supabase dashboard (still ON at the end of Run 4)
 - [ ] Owner: restrict the Google Maps key to the package name + the EAS keystore SHA-1
 
-Next (Run 5)
+Run 5 (platform pass)
 
+- [x] Dark mode (light + dark palettes, System / Light / Dark, map style, status bars)
+- [x] Filipino / English UI (490 keys, i18n:check), content stays English
+- [x] Settings, About, Photo Credits screens (gear on Home and Progress)
+- [x] Accessibility pass (AA contrast audit, 44–48 dp targets, large-font layouts)
+- [x] Map upgrade (custom pins with frozen bitmaps, chip legend, dark style, card polish)
+- [x] Audio narration in the tour (expo-speech)
+- [x] Owner: "Confirm email" turned OFF (auth:test reports it OFF on 2026-11-21)
+
+Next (Run 6)
+
+- [ ] Device pass for Run 5 (both themes, Filipino, narration audio, native pins)
 - [ ] Documentation, wireframes, web demo deploy
+- [ ] New APK (1.0.2) with the Run 5 features
 
 ## Not yet verified on a device
 
-The owner verified the Run 1–3 features on physical Android and iOS phones
-(no issues). The **Run 4 features** were checked with tsc, ESLint, unit
+The owner verified Runs 1–4 on physical devices (v1.0.1 APK on Android,
+Expo Go on iOS). **Run 5 is web- and test-verified only**: both themes on
+real screens (OLED blacks, status / navigation bar icons in edge-to-edge),
+the Filipino walkthrough, narration audio (voice, rate, auto-stop, the
+button hiding on a phone without an English voice), custom markers on
+native Google Maps (bitmap freeze, selected growth, dark style), haptics on
+the narration toggle, and the large-font action-bar stacking (web reports
+fontScale 1). Before Run 5, the **Run 4 features** were checked with tsc, ESLint, unit
 tests, an Android Hermes export, the live scripts and a 94-step web
 click-through — not yet on a phone. Phone-only parts of Run 4: the system
 location dialog and real GPS distances, haptics, the Google Maps app hand-off,

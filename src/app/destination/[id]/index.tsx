@@ -43,12 +43,14 @@ const HEADER_FADE_DISTANCE = spacing.huge;
 export default function DestinationDetailsScreen() {
   const styles = useStyles();
   const { colors } = useAppTheme();
-  const { t, errorMessage, distanceValue } = useI18n();
+  const { t, errorMessage, distance } = useI18n();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, fontScale } = useWindowDimensions();
+  // With large system text the two action buttons stack, so neither label is cut off.
+  const stackActions = fontScale >= layout.stackActionsFontScale;
   const router = useRouter();
   const isFocused = useIsFocused();
   const { notifyChanged } = useDataSync();
@@ -165,7 +167,7 @@ export default function DestinationDetailsScreen() {
     (destination &&
       images.data?.find((image) => image.image_url === destination.cover_image_url)?.caption) ||
     null;
-  const actionBarSpace = layout.actionBarHeight + insets.bottom;
+  const actionBarSpace = (stackActions ? layout.actionBarHeight * 2 : layout.actionBarHeight) + insets.bottom;
 
   return (
     <View style={styles.screen}>
@@ -233,8 +235,8 @@ export default function DestinationDetailsScreen() {
                       variant="label"
                       color="secondaryDark"
                       style={styles.flex}
-                      accessibilityLabel={t('nearMe.straightLineA11y', { distance: distanceValue(km) })}>
-                      {t('nearMe.straightLine', { distance: distanceValue(km) })}
+                      accessibilityLabel={t('nearMe.straightLineA11y', { distance: distance(km) })}>
+                      {t('nearMe.straightLine', { distance: distance(km) })}
                     </AppText>
                   </View>
                 ) : null}
@@ -403,7 +405,7 @@ export default function DestinationDetailsScreen() {
 
       {/* The two ways to learn about this place */}
       {destination ? (
-        <View style={[styles.actionBar, { paddingBottom: insets.bottom + spacing.md }]}>
+        <View style={[styles.actionBar, stackActions && styles.actionBarStacked, { paddingBottom: insets.bottom + spacing.md }]}>
           <AppButton
             label={t('details.startTour')}
             icon="walk"
@@ -411,7 +413,7 @@ export default function DestinationDetailsScreen() {
               router.push({ pathname: '/destination/[id]/tour', params: { id: destination.id } })
             }
             disabled={isDeleting}
-            style={styles.tourButton}
+            style={stackActions ? undefined : styles.tourButton}
             accessibilityHint={t('details.startTourHint')}
           />
           <AppButton
@@ -426,7 +428,7 @@ export default function DestinationDetailsScreen() {
               router.push({ pathname: '/destination/[id]/quiz', params: { id: destination.id } })
             }
             disabled={isDeleting}
-            style={styles.flex}
+            style={stackActions ? undefined : styles.flex}
             accessibilityHint={t('details.quizHint')}
           />
         </View>
@@ -531,6 +533,10 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
   },
   tourButton: {
     flex: 1.6,
+  },
+  actionBarStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   pressed: {
     opacity: layout.pressedOpacity,

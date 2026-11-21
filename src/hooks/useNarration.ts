@@ -9,6 +9,15 @@ import { SPEECH_RATE_VALUES } from '@/lib/preferences';
 
 /** Voices can load a moment after start-up on some Android engines: ask twice. */
 const VOICE_RETRY_MS = 700;
+/** Some engines (and browsers without voices) never answer: treat silence as "no voice". */
+const VOICE_TIMEOUT_MS = 2000;
+
+function voicesWithTimeout(): Promise<Speech.Voice[]> {
+  return Promise.race([
+    Speech.getAvailableVoicesAsync().catch(() => [] as Speech.Voice[]),
+    new Promise<Speech.Voice[]>((resolve) => setTimeout(() => resolve([]), VOICE_TIMEOUT_MS)),
+  ]);
+}
 
 export type Narration = {
   /** False when narration is switched off in Settings or the device has no English voice. */
@@ -36,12 +45,7 @@ export function useNarration(text: string | null | undefined): Narration {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const check = async (retry: boolean) => {
-      let voices: Speech.Voice[] = [];
-      try {
-        voices = await Speech.getAvailableVoicesAsync();
-      } catch {
-        voices = [];
-      }
+      const voices = await voicesWithTimeout();
       if (!active) return;
       const chosen = pickSpeechLanguage(voices);
       if (!chosen && retry) {

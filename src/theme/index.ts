@@ -131,6 +131,10 @@ export const layout = {
   /** Icon box and pulse ring of the narration ("Listen") button. */
   narrationIcon: 28,
   narrationRingWidth: 2,
+  /** From this OS font scale on, the Details action buttons stack vertically. */
+  stackActionsFontScale: 1.15,
+  /** Narrowest the Progress overview text may get before it wraps under the ring. */
+  overviewTextMinWidth: 184,
   /** The framed plate on each onboarding slide. */
   onboardingPlate: 184,
   /** Gold ring drawn just inside the onboarding plate. */

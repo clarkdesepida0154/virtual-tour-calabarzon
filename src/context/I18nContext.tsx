@@ -23,8 +23,6 @@ type I18nValue = {
   date: (value: string | null | undefined) => string;
   /** "12.4 km away" / "12.4 km ang layo"; '' for an invalid distance. */
   distance: (km: number) => string;
-  /** "12.4 km" / "Under 50 m away" — the distance without "away". */
-  distanceValue: (km: number) => string;
 };
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -55,11 +53,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         const value = formatDistanceValue(km);
         if (value === null) return '';
         return value === 'under-50' ? t('nearMe.under50') : t('nearMe.away', { distance: value });
-      },
-      distanceValue: (km) => {
-        const value = formatDistanceValue(km);
-        if (value === null) return '';
-        return value === 'under-50' ? t('nearMe.under50') : value;
       },
     };
   }, [locale]);

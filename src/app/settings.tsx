@@ -17,6 +17,8 @@ import { usePreferences } from '@/context/PreferencesContext';
 import { useToast } from '@/context/ToastContext';
 import { tapFeedback } from '@/lib/device';
 import type { Locale, SpeechRate, ThemePreference } from '@/lib/preferences';
+
+import appJson from '../../app.json';
 import { layout, radius, spacing } from '@/theme';
 import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
 
@@ -32,7 +34,8 @@ export default function SettingsScreen() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const { preferences, update } = usePreferences();
-  const version = Constants.expoConfig?.version ?? '1.0.0';
+  // The running build's version; the web export has no native manifest, so fall back to app.json.
+  const version = Constants.expoConfig?.version ?? appJson.expo.version;
 
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
