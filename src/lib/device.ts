@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Share } from 'react-native';
 
 import { hasCoordinates } from '@/lib/mapRegion';
-import { buildShareContent, directionsUrl } from '@/lib/outbound';
+import { buildShareContent, directionsUrl, streetViewUrl } from '@/lib/outbound';
 import type { Destination } from '@/types/database';
 
 const HAPTICS_AVAILABLE = Platform.OS === 'ios' || Platform.OS === 'android';
@@ -51,6 +51,31 @@ export async function openDirections(place: {
     } catch {
       return false;
     }
+  }
+}
+
+/**
+ * Opens Google Street View (360°) at `place` — the Google Maps app when it is
+ * installed, the browser otherwise. Resolves `false` when nothing opened.
+ */
+export async function openStreetView(place: { latitude: number | null; longitude: number | null }): Promise<boolean> {
+  const url = streetViewUrl(place);
+  if (!url) return false;
+  try {
+    await Linking.openURL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Opens any web link (e.g. the field-trip route in Google Maps). Resolves `false` when it could not. */
+export async function openExternalUrl(url: string): Promise<boolean> {
+  try {
+    await Linking.openURL(url);
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -106,6 +106,18 @@ export default function MapScreen() {
           </View>
           {allPins.length > 0 ? (
             <AppIconButton
+              icon="map-marker-path"
+              mode="contained"
+              size={iconSize.md}
+              containerColor={colors.surface}
+              iconColor={colors.primary}
+              onPress={() => router.push('/planner')}
+              accessibilityLabel={t('planner.openA11y')}
+              style={styles.roundButton}
+            />
+          ) : null}
+          {allPins.length > 0 ? (
+            <AppIconButton
               icon="arrow-expand-all"
               mode="contained"
               size={iconSize.md}

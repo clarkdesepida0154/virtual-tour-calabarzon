@@ -23,3 +23,12 @@ export type MapPreviewProps = {
   pinColor: string;
   label: string;
 };
+
+/** Shared contract of TripMap.tsx (native) and TripMap.web.tsx (Run 6). */
+export type TripMapProps = {
+  /** The stops in trip order (numbered 1…n). */
+  stops: { id: string; name: string; latitude: number; longitude: number }[];
+  /** The person's location when the trip starts there. */
+  start: { latitude: number; longitude: number } | null;
+  label: string;
+};

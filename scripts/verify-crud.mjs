@@ -37,6 +37,12 @@ import { distanceFrom, sortByDistance } from '../src/lib/geo.ts';
 import { createQuizRepository } from '../src/repositories/quiz.ts';
 import { bestScoresByDestination, summarizeProgress } from '../src/lib/progress.ts';
 import { prepareQuiz, scoreQuiz } from '../src/lib/quiz.ts';
+import { evaluateBadges } from '../src/lib/achievements.ts';
+import { syncAutoQuiz } from '../src/lib/autoQuiz.ts';
+import { qualifyingCertificates } from '../src/lib/certificate.ts';
+import { computeInsights } from '../src/lib/insights.ts';
+import { summarizeRatings, summarizeStars } from '../src/lib/ratings.ts';
+import { createRatingsRepository } from '../src/repositories/ratings.ts';
 
 const MARKER = '[verify-crud]';
 const BUCKET_MARKER = '/storage/v1/object/public/destination-images/';
@@ -72,10 +78,14 @@ const images = createDestinationImagesRepository(client);
 const quiz = createQuizRepository(client);
 const progress = createProgressRepository(client);
 const favorites = createFavoritesRepository(client);
+const ratings = createRatingsRepository(client);
 
 /** Throwaway "user key" for the progress checks; every row it writes is removed. */
 const TEST_USER_KEY = `verify-crud-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const TEST_GUEST_KEY = `${TEST_USER_KEY}-guest`;
+/** Run 6: separate throwaway keys for the ratings / badges checks. */
+const R6_USER_KEY = `${TEST_USER_KEY}-r6`;
+const R6_GUEST_KEY = `${TEST_USER_KEY}-r6-guest`;
 
 // --- tiny test harness ---
 let passed = 0;
@@ -604,7 +614,161 @@ async function main() {
     expect((await favorites.list(TEST_GUEST_KEY)).length === 0, 'guest favorites remain');
   });
 
+  // --- Run 6: starter quizzes, ratings, insights, badges ---
+  console.log('\nRun 6 feature modules');
+
+  await check('quiz_questions.source: every dataset question is curated (130), none auto', async () => {
+    let curated = 0;
+    let auto = 0;
+    for (const destination of await destinations.list()) {
+      const counts = await quiz.countBySource(destination.id);
+      curated += counts.curated;
+      auto += counts.auto;
+    }
+    expect(curated === 130, `curated questions: ${curated}`);
+    expect(auto === 0, `auto questions on the dataset: ${auto}`);
+    const loaded = await quiz.getForDestination(first.id);
+    expect(loaded.every((question) => question.source === 'curated'), 'source not loaded with the quiz');
+  });
+
+  let autoDestination = null;
+  await check('create → starter quiz: 5 auto questions, exactly one correct option each', async () => {
+    autoDestination = await destinations.create(
+      toDestinationInput(
+        {
+          ...EMPTY_FORM_VALUES,
+          name: `${MARKER} Casa Tejeros`,
+          description:
+            'A restored estate house where revolutionary leaders gathered in 1897. The convention held here elected new officers and changed the course of the uprising in the province.',
+          address: 'Rosario, Cavite',
+          municipality: 'Rosario',
+          province: 'Cavite',
+          category: 'Historical Site',
+        },
+        null,
+      ),
+    );
+    const outcome = await syncAutoQuiz({ quiz, saved: autoDestination, catalogue: await destinations.list() });
+    expect(outcome === 'written', `outcome ${outcome}`);
+    const questions = await quiz.getForDestination(autoDestination.id);
+    expect(questions.length === 5, `expected 5 questions, got ${questions.length}`);
+    expect(questions.every((question) => question.source === 'auto'), 'not all auto');
+    expect(sameList(questions.map((q) => q.sort_order), [1, 2, 3, 4, 5]), 'sort orders');
+    for (const question of questions) {
+      expect(question.options.filter((option) => option.is_correct).length === 1, `${question.question_text}: not exactly 1 correct`);
+    }
+    const shuffled = prepareQuiz(questions);
+    const answers = Object.fromEntries(shuffled.map((q) => [q.id, q.options.find((o) => o.is_correct).id]));
+    expect(scoreQuiz(shuffled, answers).score === 5, 'the starter quiz does not score 5/5 with right answers');
+  });
+
+  await check('edit of a quiz field regenerates the starter quiz; an address-only edit leaves it', async () => {
+    const before = await quiz.getForDestination(autoDestination.id);
+    const renamed = await destinations.update(autoDestination.id, { name: `${MARKER} Tejeros Convention Site` });
+    expect((await syncAutoQuiz({ quiz, saved: renamed, previous: autoDestination, catalogue: await destinations.list() })) === 'written', 'not regenerated');
+    const after = await quiz.getForDestination(autoDestination.id);
+    expect(after.length === 5, `expected 5 after regeneration, got ${after.length}`);
+    expect(!after.some((q) => before.some((old) => old.id === q.id)), 'old auto rows were not replaced');
+    expect(after.some((q) => q.question_text.includes('Tejeros Convention Site')), 'new name not used');
+    const moved = await destinations.update(autoDestination.id, { address: 'Tejeros, Rosario, Cavite' });
+    expect((await syncAutoQuiz({ quiz, saved: moved, previous: renamed, catalogue: [] })) === 'unchanged', 'address edit regenerated');
+    const same = await quiz.getForDestination(autoDestination.id);
+    expect(sameList(same.map((q) => q.id), after.map((q) => q.id)), 'questions changed on an address edit');
+    const { count } = await client.from('quiz_options').select('id', { count: 'exact', head: true }).in('question_id', before.map((q) => q.id));
+    expect(count === 0, `${count} options of the old questions left behind`);
+  });
+
+  await check('curated quizzes are never touched by the starter-quiz sync', async () => {
+    const before = await quiz.getForDestination(first.id);
+    const outcome = await syncAutoQuiz({ quiz, saved: { ...first, description: 'x', name: `${first.name} renamed` }, previous: { ...first, description: 'y' }, catalogue: [] });
+    expect(outcome === 'skipped-curated', `outcome ${outcome}`);
+    const after = await quiz.getForDestination(first.id);
+    expect(sameList(after.map((q) => q.id), before.map((q) => q.id)), 'curated questions changed');
+    expect(after.every((q) => q.source === 'curated'), 'source changed');
+  });
+
+  await check('a starter quiz cascades away with its destination', async () => {
+    const ids = (await quiz.getForDestination(autoDestination.id)).map((q) => q.id);
+    await destinations.remove(autoDestination.id);
+    const { count } = await client.from('quiz_questions').select('id', { count: 'exact', head: true }).in('id', ids);
+    expect(count === 0, `${count} questions left`);
+    autoDestination = null;
+  });
+
+  await check('ratings: rate() upserts — re-rating replaces the stars, one row per key', async () => {
+    const one = await ratings.rate(R6_USER_KEY, first.id, 4);
+    const two = await ratings.rate(R6_USER_KEY, first.id, 2);
+    expect(one.id === two.id, 're-rating created a new row');
+    expect(two.stars === 2, `stars ${two.stars}`);
+    expect((await ratings.listMine(R6_USER_KEY)).length === 1, 'more than one row');
+    expect((await ratings.getMine(R6_USER_KEY, first.id))?.stars === 2, 'getMine wrong');
+  });
+
+  await check('ratings: unique (destination, key) and 1–5 check enforced by the database', async () => {
+    const duplicate = await client.from('ratings').insert({ device_id: R6_USER_KEY, destination_id: first.id, stars: 5 });
+    expect(duplicate.error?.code === '23505', `duplicate not rejected (${duplicate.error?.code ?? 'no error'})`);
+    const tooMany = await client.from('ratings').insert({ device_id: R6_GUEST_KEY, destination_id: first.id, stars: 6 });
+    expect(tooMany.error?.code === '23514', `6 stars not rejected (${tooMany.error?.code ?? 'no error'})`);
+  });
+
+  await check('ratings: isolated per key; average to one decimal over every key', async () => {
+    expect((await ratings.getMine(R6_GUEST_KEY, first.id)) === null, 'another key sees the rating');
+    await ratings.rate(R6_GUEST_KEY, first.id, 5);
+    const rows = (await ratings.listForDestination(first.id)).filter(() => true);
+    const ours = rows.length; // other people may have rated this place too
+    const summary = summarizeStars(rows.map((row) => row.stars));
+    expect(summary && summary.count === ours, 'count wrong');
+    const expected = Math.round((rows.reduce((sum, row) => sum + row.stars, 0) / ours) * 10) / 10;
+    expect(summary.average === expected, `average ${summary.average} vs ${expected}`);
+    const all = summarizeRatings(await ratings.listAll());
+    expect(all[first.id]?.count === ours, 'listAll summary disagrees');
+  });
+
+  await check('transferProgress() moves ratings to the account, keeping the account’s own on a clash', async () => {
+    // Account (R6_USER_KEY) rated first = 2. Guest rated first = 5 (clash) and now second = 4 (new).
+    await ratings.rate(R6_GUEST_KEY, second.id, 4);
+    await progress.transferProgress(R6_GUEST_KEY, R6_USER_KEY);
+    expect((await ratings.listMine(R6_GUEST_KEY)).length === 0, 'guest ratings left behind');
+    const mine = await ratings.listMine(R6_USER_KEY);
+    expect(mine.length === 2, `account has ${mine.length} ratings`);
+    expect(mine.find((row) => row.destination_id === first.id)?.stars === 2, 'account rating overwritten by the guest copy');
+    expect(mine.find((row) => row.destination_id === second.id)?.stars === 4, 'guest rating not moved');
+  });
+
+  await check('insights + badges + certificates from live rows', async () => {
+    await progress.markVisited(R6_USER_KEY, first.id);
+    await progress.recordAttempt({ userKey: R6_USER_KEY, destinationId: first.id, score: 1, total: 5 });
+    const catalogue = await destinations.list();
+    const insights = computeInsights({
+      destinations: catalogue,
+      completions: await progress.listAllCompletions(),
+      attempts: await progress.listAllAttempts(),
+      ratings: await ratings.listAll(),
+    });
+    expect(insights.mostVisited.some((row) => row.destination.id === first.id), 'visit missing from Most visited');
+    expect(insights.topRated.some((row) => row.destination.id === first.id), 'rating missing from Top rated');
+    expect(insights.toughestQuizzes.some((row) => row.destination.id === first.id), 'attempt missing from Toughest quizzes');
+    const badges = evaluateBadges({
+      destinations: catalogue,
+      completions: await progress.listCompletions(R6_USER_KEY),
+      attempts: await progress.listAttempts(R6_USER_KEY),
+      favorites: await favorites.list(R6_USER_KEY),
+    });
+    const firstJourney = badges.find((entry) => entry.badge.id === 'first-journey');
+    expect(firstJourney.earned && firstJourney.earnedAt, 'First Journey not earned / no date');
+    expect(qualifyingCertificates(catalogue, await progress.listCompletions(R6_USER_KEY)).length === 0, 'certificate without a full province');
+  });
+
+  await check('removeAllFor() also clears ratings', async () => {
+    await progress.removeAllFor(R6_USER_KEY);
+    await progress.removeAllFor(R6_GUEST_KEY);
+    expect((await ratings.listMine(R6_USER_KEY)).length === 0, 'ratings remain');
+    expect((await progress.listCompletions(R6_USER_KEY)).length === 0, 'visits remain');
+  });
+
   // --- clean-up, even after failures ---
+  await progress.removeAllFor(R6_USER_KEY).catch(() => {});
+  await progress.removeAllFor(R6_GUEST_KEY).catch(() => {});
   await progress.removeAllFor(TEST_USER_KEY).catch(() => {});
   await progress.removeAllFor(TEST_GUEST_KEY).catch(() => {});
   const leftovers = await destinations.list({ search: MARKER }).catch(() => []);

@@ -10,7 +10,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, BackHandler, FlatList, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInLeft, FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,9 @@ import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { useDestinationProgress } from '@/hooks/useProgress';
-import { openDirections, successFeedback } from '@/lib/device';
+import { useAchievementsCheck } from '@/context/AchievementsContext';
+import { useShowingSavedData } from '@/lib/appCache';
+import { openDirections, openStreetView, successFeedback, tapFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatPlace, splitLead } from '@/lib/format';
 import { hasCoordinates } from '@/lib/mapRegion';
@@ -139,7 +141,7 @@ export default function VirtualTourScreen() {
         {step === 'intro' ? (
           <IntroStep destination={destination} cover={plates[0]} visited={progress.data?.visited ?? false} />
         ) : step === 'gallery' ? (
-          <GalleryStep plates={plates} topInset={insets.top} />
+          <GalleryStep plates={plates} topInset={insets.top} destination={destination} />
         ) : step === 'history' ? (
           <ChapterStep
             numeral="I"
@@ -292,7 +294,15 @@ function IntroStep({
   );
 }
 
-function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }) {
+function GalleryStep({
+  plates,
+  topInset,
+  destination,
+}: {
+  plates: Plate[];
+  topInset: number;
+  destination: Destination;
+}) {
   const styles = useStyles();
   const { t } = useI18n();
   const { colors } = useAppTheme();
@@ -389,8 +399,53 @@ function GalleryStep({ plates, topInset }: { plates: Plate[]; topInset: number }
           {t('tour.gallery.plate', { index: index + 1, count: plates.length })}
         </AppText>
         {current?.caption ? <Credit caption={current.caption} dark /> : null}
+        <StreetViewCard destination={destination} />
       </View>
     </View>
+  );
+}
+
+/**
+ * Run 6: "View in 360°" — a card on the gallery wall that opens Google
+ * Street View at the destination. Hidden offline and without coordinates.
+ * (It lives on the Gallery step instead of a step of its own, so the tour's
+ * step sequence — and the flows built on it — stay exactly as they were.)
+ */
+function StreetViewCard({ destination }: { destination: Destination }) {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const { showToast } = useToast();
+  const offline = useShowingSavedData();
+  if (offline || !hasCoordinates(destination)) return null;
+
+  const open = async () => {
+    tapFeedback();
+    if (!(await openStreetView(destination))) showToast(t('streetView.failed'));
+  };
+
+  return (
+    <Pressable
+      onPress={() => void open()}
+      accessibilityRole="button"
+      accessibilityLabel={t('streetView.actionA11y', { name: destination.name })}
+      accessibilityHint={t('streetView.hint')}
+      style={({ pressed }) => [styles.panoCard, pressed && styles.pressed]}>
+      <View style={styles.panoIcon}>
+        <AppIcon name="rotate-3d-variant" size="md" color="secondary" />
+      </View>
+      <View style={styles.flex}>
+        <AppText variant="overline" color="secondary">
+          {t('streetView.tourOverline')}
+        </AppText>
+        <AppText variant="subtitle" color="onPhoto">
+          {t('streetView.action')}
+        </AppText>
+        <AppText variant="caption" color="onExhibitSoft">
+          {t('streetView.tourBody')}
+        </AppText>
+      </View>
+      <AppIcon name="open-in-new" size="sm" color="onPhoto" />
+    </Pressable>
   );
 }
 
@@ -488,6 +543,7 @@ function CompletionStep({
   const { userKey } = useIdentity();
   const { notifyChanged } = useDataSync();
   const { showToast } = useToast();
+  const { checkAchievements } = useAchievementsCheck();
   const [saving, setSaving] = useState(false);
   // Shown straight away after a successful save, before the refetch lands.
   const [justVisitedAt, setJustVisitedAt] = useState<string | null>(null);
@@ -503,6 +559,7 @@ function CompletionStep({
       setJustVisitedAt(row.completed_at ?? new Date().toISOString());
       successFeedback();
       notifyChanged();
+      checkAchievements();
     } catch (cause) {
       showToast(errorMessage(toAppError(cause, 'markVisited')));
     } finally {
@@ -792,6 +849,31 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: 'flex-start',
     gap: spacing.xs,
     alignSelf: 'stretch',
+  },
+  pressed: {
+    opacity: layout.pressedOpacity,
+  },
+  panoCard: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: layout.touchTarget,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.glass,
+    borderWidth: layout.hairline,
+    borderColor: colors.secondary,
+  },
+  panoIcon: {
+    width: layout.iconBadge,
+    height: layout.iconBadge,
+    borderRadius: radius.pill,
+    borderWidth: layout.hairline,
+    borderColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Chapters
   chapter: {

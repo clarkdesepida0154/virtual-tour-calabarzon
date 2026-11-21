@@ -20,6 +20,19 @@ export function directionsUrl(place: { latitude: number | null; longitude: numbe
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
 
+/**
+ * Google Street View at a place (Run 6): the no-key Maps URL scheme
+ * `map_action=pano`. Google Maps opens the nearest panorama; where there is
+ * none, Google itself shows the map instead, so the link never dead-ends.
+ * Returns `null` without usable coordinates.
+ */
+export function streetViewUrl(place: { latitude: number | null; longitude: number | null }): string | null {
+  if (!hasCoordinates(place)) return null;
+  const lat = Number(place.latitude.toFixed(6));
+  const lng = Number(place.longitude.toFixed(6));
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+}
+
 /** The opening sentence of a description, for one-line summaries. */
 export function oneLineSummary(text: string, maxLength = 200): string {
   const { lead, rest } = splitLead(text, maxLength);

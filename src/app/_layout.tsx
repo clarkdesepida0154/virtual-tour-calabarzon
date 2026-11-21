@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { PaperProvider } from 'react-native-paper';
 
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { AchievementsProvider } from '@/context/AchievementsContext';
 import { DataSyncProvider } from '@/context/DataSyncContext';
 import { ExploreFiltersProvider } from '@/context/ExploreFiltersContext';
 import { FavoritesProvider } from '@/context/FavoritesContext';
@@ -66,8 +67,10 @@ function ThemedApp() {
               <ExploreFiltersProvider>
                 <ToastProvider>
                   <FavoritesProvider>
-                    <RootNavigator />
-                    <ThemedStatusBar />
+                    <AchievementsProvider>
+                      <RootNavigator />
+                      <ThemedStatusBar />
+                    </AchievementsProvider>
                   </FavoritesProvider>
                 </ToastProvider>
               </ExploreFiltersProvider>
@@ -131,6 +134,11 @@ function RootNavigator() {
         <Stack.Screen name="add" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="settings" />
         <Stack.Screen name="credits" />
+        {/* Run 6 feature modules */}
+        <Stack.Screen name="badges" />
+        <Stack.Screen name="insights" />
+        <Stack.Screen name="certificate" />
+        <Stack.Screen name="planner" />
       </Stack.Protected>
 
       {/* Reachable from Welcome and, for guests, from the Progress tab. */}

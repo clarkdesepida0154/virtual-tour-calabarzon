@@ -36,7 +36,9 @@ import {
 import type { DestinationFormField, DestinationFormValues } from '@/lib/destinationForm';
 import { toAppError } from '@/lib/errors';
 import type { AppError } from '@/lib/errors';
-import { destinationImagesRepository, destinationsRepository } from '@/repositories';
+import { loadCatalogue } from '@/hooks/useDestinations';
+import { syncAutoQuiz } from '@/lib/autoQuiz';
+import { destinationImagesRepository, destinationsRepository, quizRepository } from '@/repositories';
 import { layout, radius, spacing } from '@/theme';
 import { makeStyles } from '@/theme/ThemeProvider';
 import type { Destination } from '@/types/database';
@@ -198,6 +200,15 @@ export function DestinationForm({ destination, onSaved, onCancel }: Props) {
         void destinationImagesRepository.removeByPublicUrl(previousUrl);
         // ...and drop its row (and credit line) from the destination's photo list.
         void destinationImagesRepository.removeRecordByUrl(destination.id, previousUrl);
+      }
+
+      // Run 6: a user-added destination gets an auto-generated starter quiz
+      // (re-generated when a quiz field changes; curated quizzes are never
+      // touched). Best-effort — a failure here never undoes the save.
+      try {
+        await syncAutoQuiz({ quiz: quizRepository, saved, previous: destination ?? null, catalogue: await loadCatalogue() });
+      } catch {
+        // The entry is saved; its quiz can be generated on the next edit.
       }
 
       notifyChanged();

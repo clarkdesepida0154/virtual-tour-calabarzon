@@ -152,6 +152,22 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Run 6: the field-trip planner and community insights */}
+        <View style={[styles.section, styles.tools]}>
+          <ToolCard
+            icon="map-marker-path"
+            title={t('planner.homeTitle')}
+            body={t('planner.homeBody')}
+            onPress={() => router.push('/planner')}
+          />
+          <ToolCard
+            icon="chart-box-outline"
+            title={t('insights.homeTitle')}
+            body={t('insights.homeBody')}
+            onPress={() => router.push('/insights')}
+          />
+        </View>
+
         {/* Category grid */}
         <View style={styles.section}>
           <SectionHeader
@@ -203,6 +219,38 @@ export default function HomeScreen() {
       {/* Keeps the status bar readable once the hero scrolls away. */}
       <View style={[styles.statusBarBacking, { height: insets.top }]} pointerEvents="none" />
     </View>
+  );
+}
+
+type ToolCardProps = {
+  icon: 'map-marker-path' | 'chart-box-outline';
+  title: string;
+  body: string;
+  onPress: () => void;
+};
+
+/** A shortcut card to a Run 6 tool (planner, insights). */
+function ToolCard({ icon, title, body, onPress }: ToolCardProps) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${body}`}
+      android_ripple={{ color: colors.pressed }}
+      style={({ pressed }) => [styles.tool, pressed && styles.pressed]}>
+      <View style={styles.toolIcon}>
+        <AppIcon name={icon} size="md" color="primary" />
+      </View>
+      <View style={styles.flex}>
+        <AppText variant="subtitle">{title}</AppText>
+        <AppText variant="caption" color="inkSoft">
+          {body}
+        </AppText>
+      </View>
+      <AppIcon name="chevron-right" size="md" color="muted" />
+    </Pressable>
   );
 }
 
@@ -356,6 +404,31 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
     gap: spacing.lg,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xs,
+  },
+  tools: {
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  tool: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: layout.touchTarget + spacing.xl,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: layout.hairline,
+    borderColor: colors.outline,
+    overflow: 'hidden',
+    ...elevation.card,
+  },
+  toolIcon: {
+    width: layout.iconBadge,
+    height: layout.iconBadge,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   grid: {
     flexDirection: 'row',

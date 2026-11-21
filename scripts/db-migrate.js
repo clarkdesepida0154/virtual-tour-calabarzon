@@ -21,6 +21,21 @@ const { ROOT } = require('./lib/env');
 
 const DIR = path.join(ROOT, 'supabase', 'migrations');
 
+/**
+ * Row counts that a migration must never change. Tables that a migration may
+ * be about to create (favorites, ratings) are counted only when they exist.
+ */
+const COUNTS_SQL = `select (select count(*)::int from public.destinations) as destinations,
+       (select count(*)::int from public.destination_images) as photos,
+       (select count(*)::int from public.quiz_questions) as questions,
+       (select count(*)::int from public.quiz_options) as options,
+       (select count(*)::int from public.quiz_attempts) as attempts,
+       (select count(*)::int from public.destination_completions) as visits,
+       case when to_regclass('public.favorites') is null then null
+            else (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.favorites', false, true, '')))[1]::text::int end as favorites,
+       case when to_regclass('public.ratings') is null then null
+            else (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.ratings', false, true, '')))[1]::text::int end as ratings`;
+
 async function main() {
   const files = fs
     .readdirSync(DIR)
@@ -34,9 +49,7 @@ async function main() {
   const client = await connect();
   try {
     const before = await client.query(
-      `select (select count(*)::int from public.destinations) as destinations,
-              (select count(*)::int from public.quiz_attempts) as attempts,
-              (select count(*)::int from public.destination_completions) as visits`,
+      COUNTS_SQL,
     );
     console.log('Rows before:', before.rows[0]);
 
@@ -56,13 +69,12 @@ async function main() {
     }
 
     const after = await client.query(
-      `select (select count(*)::int from public.destinations) as destinations,
-              (select count(*)::int from public.quiz_attempts) as attempts,
-              (select count(*)::int from public.destination_completions) as visits`,
+      COUNTS_SQL,
     );
     console.log('Rows after: ', after.rows[0]);
+    // A table that did not exist before (null) may appear; nothing else may change.
     const changed = Object.keys(before.rows[0]).filter(
-      (key) => before.rows[0][key] !== after.rows[0][key],
+      (key) => before.rows[0][key] !== null && before.rows[0][key] !== after.rows[0][key],
     );
     if (changed.length > 0) throw new Error(`Existing data changed: ${changed.join(', ')}`);
     console.log('Existing data untouched.');

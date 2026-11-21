@@ -19,6 +19,7 @@ import { DetailsBodySkeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { CategoryTag, ProvinceTag } from '@/components/Tag';
 import { MapPreview } from '@/components/map/MapPreview';
+import { RatingCard } from '@/components/RatingCard';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { useDataSync } from '@/context/DataSyncContext';
@@ -26,7 +27,8 @@ import { useUserLocation } from '@/context/LocationContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestination, useDestinationImages } from '@/hooks/useDestinations';
 import { useDestinationProgress } from '@/hooks/useProgress';
-import { openDirections, shareDestination } from '@/lib/device';
+import { useShowingSavedData } from '@/lib/appCache';
+import { openDirections, openStreetView, shareDestination, tapFeedback } from '@/lib/device';
 import { toAppError } from '@/lib/errors';
 import { formatCoordinates } from '@/lib/format';
 import { distanceFrom } from '@/lib/geo';
@@ -61,6 +63,8 @@ export default function DestinationDetailsScreen() {
   // Has the current user toured this place, and how did their quizzes go?
   const progress = useDestinationProgress(id);
   const location = useUserLocation();
+  // Street View needs the network: the 360° button hides while offline.
+  const offline = useShowingSavedData();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -155,6 +159,12 @@ export default function DestinationDetailsScreen() {
     if (!destination) return;
     const opened = await openDirections(destination);
     if (!opened) showToast(t('details.directionsFailed'));
+  };
+
+  const viewIn360 = async () => {
+    if (!destination) return;
+    tapFeedback();
+    if (!(await openStreetView(destination))) showToast(t('streetView.failed'));
   };
 
   const share = async () => {
@@ -255,14 +265,26 @@ export default function DestinationDetailsScreen() {
               </View>
 
               {hasCoordinates(destination) ? (
-                <AppButton
-                  label={t('details.getDirections')}
-                  icon="directions"
-                  variant="secondary"
-                  onPress={() => void getDirections()}
-                  accessibilityHint={t('details.directionsHint')}
-                  style={styles.directions}
-                />
+                <View style={styles.outbound}>
+                  <AppButton
+                    label={t('details.getDirections')}
+                    icon="directions"
+                    variant="secondary"
+                    onPress={() => void getDirections()}
+                    accessibilityHint={t('details.directionsHint')}
+                    style={styles.directions}
+                  />
+                  {!offline ? (
+                    <AppButton
+                      label={t('streetView.action')}
+                      icon="rotate-3d-variant"
+                      variant="secondary"
+                      onPress={() => void viewIn360()}
+                      accessibilityHint={t('streetView.hint')}
+                      style={styles.directions}
+                    />
+                  ) : null}
+                </View>
               ) : null}
 
               <AppText variant="bodyLarge" color="ink">
@@ -319,6 +341,8 @@ export default function DestinationDetailsScreen() {
                   body={destination.cultural_significance}
                 />
               ) : null}
+
+              <RatingCard destinationId={destination.id} />
 
               {coverCredit ? (
                 <View style={styles.credit}>
@@ -678,6 +702,11 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
   },
   directions: {
     alignSelf: 'flex-start',
+  },
+  outbound: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   roundButton: {
     ...elevation.card,

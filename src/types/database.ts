@@ -85,11 +85,16 @@ export type DestinationImageUpdate = Partial<DestinationImageInsert>;
 // quiz_questions / quiz_options (Phase 2 quiz engine)
 // ---------------------------------------------------------------------------
 
+/** Where a question came from: the curated dataset, or generated in the app (Run 6). */
+export type QuizSource = 'curated' | 'auto';
+
 export type QuizQuestion = {
   id: string;
   destination_id: string;
   question_text: string;
   sort_order: number;
+  /** Always present in rows read since Run 6 (the column defaults to 'curated'). */
+  source?: QuizSource;
 };
 
 export type QuizQuestionInsert = {
@@ -97,6 +102,7 @@ export type QuizQuestionInsert = {
   destination_id: string;
   question_text: string;
   sort_order?: number;
+  source?: QuizSource;
 };
 
 export type QuizQuestionUpdate = Partial<QuizQuestionInsert>;
@@ -183,6 +189,30 @@ export type FavoriteInsert = {
 export type FavoriteUpdate = Partial<FavoriteInsert>;
 
 // ---------------------------------------------------------------------------
+// ratings (Run 6) — one 1–5 star rating per destination per user key
+// ---------------------------------------------------------------------------
+
+export type Rating = {
+  id: string;
+  destination_id: string;
+  device_id: string;
+  stars: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type RatingInsert = {
+  id?: string;
+  destination_id: string;
+  device_id: string;
+  stars: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type RatingUpdate = Partial<RatingInsert>;
+
+// ---------------------------------------------------------------------------
 // Database shape consumed by createClient<Database>()
 // ---------------------------------------------------------------------------
 
@@ -255,6 +285,14 @@ export type Database = {
         Update: FavoriteUpdate;
         Relationships: [
           ForeignKey<'favorites_destination_id_fkey', 'destination_id', 'destinations'>,
+        ];
+      };
+      ratings: {
+        Row: Rating;
+        Insert: RatingInsert;
+        Update: RatingUpdate;
+        Relationships: [
+          ForeignKey<'ratings_destination_id_fkey', 'destination_id', 'destinations'>,
         ];
       };
     };

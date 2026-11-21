@@ -19,6 +19,7 @@
 -- -----------------------------------------------------------------------------
 -- RESET (1/2): tables, their policies/triggers/indexes, and helper functions
 -- -----------------------------------------------------------------------------
+drop table if exists public.ratings cascade;
 drop table if exists public.favorites cascade;
 drop table if exists public.destination_completions cascade;
 drop table if exists public.quiz_attempts cascade;
@@ -89,7 +90,10 @@ create table public.quiz_questions (
   id             uuid primary key default gen_random_uuid(),
   destination_id uuid not null references public.destinations (id) on delete cascade,
   question_text  text not null,
-  sort_order     integer not null default 0
+  sort_order     integer not null default 0,
+  -- Run 6: 'curated' (the dataset) or 'auto' (generated in the app for a
+  -- user-added destination). Added live by migrations/20261121_quiz_source.sql.
+  source         text not null default 'curated' check (source in ('curated', 'auto'))
 );
 
 create table public.quiz_options (
@@ -130,6 +134,18 @@ create table public.favorites (
   unique (destination_id, device_id)
 );
 
+-- Run 6: one 1–5 star rating per destination per user key. Added live by
+-- supabase/migrations/20261122_ratings.sql (`npm run db:migrate`).
+create table public.ratings (
+  id             uuid primary key default gen_random_uuid(),
+  destination_id uuid not null references public.destinations (id) on delete cascade,
+  device_id      text not null,
+  stars          integer not null check (stars between 1 and 5),
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now(),
+  unique (destination_id, device_id)
+);
+
 -- Indexes for the Explore filters and the foreign keys.
 create index destinations_province_idx on public.destinations (province);
 create index destinations_category_idx on public.destinations (category);
@@ -143,6 +159,9 @@ create index quiz_attempts_device_idx on public.quiz_attempts (device_id, destin
 create index destination_completions_device_idx
   on public.destination_completions (device_id);
 create index favorites_device_idx on public.favorites (device_id);
+create index quiz_questions_source_idx on public.quiz_questions (destination_id, source);
+create index ratings_device_idx on public.ratings (device_id);
+create index ratings_destination_idx on public.ratings (destination_id);
 
 -- Keep destinations.updated_at fresh on every edit.
 create function public.set_updated_at()
@@ -158,6 +177,10 @@ $$;
 
 create trigger destinations_set_updated_at
   before update on public.destinations
+  for each row execute function public.set_updated_at();
+
+create trigger ratings_set_updated_at
+  before update on public.ratings
   for each row execute function public.set_updated_at();
 
 
@@ -187,7 +210,8 @@ begin
     'quiz_options',
     'quiz_attempts',
     'destination_completions',
-    'favorites'
+    'favorites',
+    'ratings'
   ]
   loop
     execute format('alter table public.%I enable row level security', t);

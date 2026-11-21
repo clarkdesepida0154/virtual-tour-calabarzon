@@ -5,11 +5,13 @@ import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { CoverImage } from '@/components/CoverImage';
 import { FavoriteButton } from '@/components/FavoriteButton';
+import { RatingInline } from '@/components/StarRating';
 import { CategoryTag } from '@/components/Tag';
 import { CATEGORY_META } from '@/constants/taxonomy';
 import { formatPlace } from '@/lib/format';
 import { layout, radius, spacing } from '@/theme';
 import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
+import type { RatingSummary } from '@/lib/ratings';
 import type { DestinationSummary } from '@/types/database';
 import { useI18n } from '@/context/I18nContext';
 
@@ -21,13 +23,15 @@ type Props = {
 type CardProps = Props & {
   /** "12.4 km away" — shown only when the user's location is known. */
   distance?: string | null;
+  /** Run 6: community average, shown as "★ 4.6 (12)" when the place has ratings. */
+  rating?: RatingSummary | null;
 };
 
 /**
  * Explore list card: photo with a favorite heart, category tag, serif name,
  * where it is, and (with Near me) how far away.
  */
-export function DestinationCard({ destination, onPress, distance }: CardProps) {
+export function DestinationCard({ destination, onPress, distance, rating }: CardProps) {
   const styles = useStyles();
   const { t, categoryLabel } = useI18n();
   const category = categoryLabel(destination.category);
@@ -79,6 +83,7 @@ export function DestinationCard({ destination, onPress, distance }: CardProps) {
               </AppText>
             </View>
           ) : null}
+          <RatingInline summary={rating} />
         </View>
       </View>
     </Pressable>

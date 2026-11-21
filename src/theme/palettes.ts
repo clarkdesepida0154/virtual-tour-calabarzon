@@ -69,6 +69,14 @@ export type Palette = {
   onExhibitFaint: string;
   glass: string;
 
+  /** Certificate of completion: cream parchment in BOTH themes (a printed document). */
+  parchment: string;
+  parchmentDeep: string;
+  onParchment: string;
+  onParchmentSoft: string;
+  /** Gold for the certificate's rules, motif and accent text. */
+  parchmentGold: string;
+
   /** Map pins and legend dots: one clearly different hue per category. */
   categoryHistorical: string;
   categoryChurch: string;
@@ -96,6 +104,11 @@ const CONSTANTS = {
   onExhibitSoft: 'rgba(255, 255, 255, 0.72)',
   onExhibitFaint: 'rgba(255, 255, 255, 0.32)',
   glass: 'rgba(28, 24, 20, 0.48)',
+  parchment: '#F7EEDB',
+  parchmentDeep: '#EADBB9',
+  onParchment: '#33251B',
+  onParchmentSoft: '#5E4A39',
+  parchmentGold: '#7A5C0E',
   transparent: 'transparent',
 } as const;
 

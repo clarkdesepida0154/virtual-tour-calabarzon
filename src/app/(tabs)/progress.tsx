@@ -1,5 +1,5 @@
 import { useIsFocused, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
@@ -17,11 +17,14 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Skeleton } from '@/components/Skeleton';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { useAchievementsCheck } from '@/context/AchievementsContext';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useToast } from '@/context/ToastContext';
 import { useDestinations } from '@/hooks/useDestinations';
+import { useAchievements } from '@/hooks/useAchievements';
 import { useProgressSummary } from '@/hooks/useProgress';
+import { earnedCount } from '@/lib/achievements';
 import { favoriteDestinations } from '@/lib/favorites';
 import { toAppError } from '@/lib/errors';
 import { formatPlace } from '@/lib/format';
@@ -38,6 +41,13 @@ export default function ProgressScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const summary = useProgressSummary();
+  const { checkAchievements } = useAchievementsCheck();
+  const loaded = summary.status === 'success';
+
+  // Run 6: the Progress tab is one of the places where new badges are noticed.
+  useEffect(() => {
+    if (isFocused && loaded) checkAchievements();
+  }, [isFocused, loaded, summary.data, checkAchievements]);
 
   return (
     <View style={styles.screen}>
@@ -58,16 +68,28 @@ export default function ProgressScreen() {
           overline={t('progress.overline')}
           title={t('progress.title')}
           action={
-            <AppIconButton
-              icon="cog-outline"
-              mode="contained"
-              size={iconSize.md}
-              containerColor={colors.surface}
-              iconColor={colors.ink}
-              onPress={() => router.push('/settings')}
-              accessibilityLabel={t('settings.openA11y')}
-              style={styles.gear}
-            />
+            <View style={styles.headerActions}>
+              <AppIconButton
+                icon="chart-box-outline"
+                mode="contained"
+                size={iconSize.md}
+                containerColor={colors.surface}
+                iconColor={colors.ink}
+                onPress={() => router.push('/insights')}
+                accessibilityLabel={t('insights.openA11y')}
+                style={styles.gear}
+              />
+              <AppIconButton
+                icon="cog-outline"
+                mode="contained"
+                size={iconSize.md}
+                containerColor={colors.surface}
+                iconColor={colors.ink}
+                onPress={() => router.push('/settings')}
+                accessibilityLabel={t('settings.openA11y')}
+                style={styles.gear}
+              />
+            </View>
           }
         />
 
@@ -179,8 +201,10 @@ function ProgressBody({
   onExplore: () => void;
 }) {
   const styles = useStyles();
+  const router = useRouter();
   const { t, provinceTagline } = useI18n();
   const share = summary.totalDestinations > 0 ? summary.visitedCount / summary.totalDestinations : 0;
+  const allVisited = summary.visitedCount === summary.totalDestinations && summary.totalDestinations > 0;
 
   return (
     <>
@@ -207,10 +231,18 @@ function ProgressBody({
             </AppText>
             <AppText variant="sectionTitle">{t('progress.shareOfRegion', { percent: Math.round(share * 100) })}</AppText>
             <AppText variant="body" color="inkSoft">
-              {summary.visitedCount === summary.totalDestinations && summary.totalDestinations > 0
-                ? t('progress.allVisited')
-                : t('progress.fillRing')}
+              {allVisited ? t('progress.allVisited') : t('progress.fillRing')}
             </AppText>
+            {allVisited ? (
+              <AppButton
+                label={t('achievements.viewCertificate')}
+                icon="certificate-outline"
+                variant="text"
+                onPress={() => router.push({ pathname: '/certificate', params: { scope: 'region' } })}
+                accessibilityHint={t('achievements.viewCertificateA11y', { title: t('certificate.regionTitle') })}
+                style={styles.certificateButton}
+              />
+            ) : null}
           </View>
         </View>
 
@@ -228,6 +260,8 @@ function ProgressBody({
           />
         </View>
       </View>
+
+      <BadgesEntry />
 
       <FavoritesSection onOpen={onOpen} onExplore={onExplore} />
 
@@ -247,6 +281,16 @@ function ProgressBody({
                 {t('progress.byProvince.ofTotal', { visited: row.visited, total: row.total })}
               </AppText>
             </View>
+            {row.total > 0 && row.visited === row.total ? (
+              <AppButton
+                label={t('achievements.viewCertificate')}
+                icon="certificate-outline"
+                variant="text"
+                onPress={() => router.push({ pathname: '/certificate', params: { scope: row.province } })}
+                accessibilityHint={t('achievements.viewCertificateA11y', { title: t('certificate.provinceTitle', { province: row.province }) })}
+                style={styles.certificateButton}
+              />
+            ) : null}
             <Meter
               value={row.total > 0 ? row.visited / row.total : 0}
               color={row.total > 0 && row.visited === row.total ? 'success' : 'secondary'}
@@ -277,6 +321,47 @@ function ProgressBody({
         </View>
       )}
     </>
+  );
+}
+
+/** Run 6: a card that opens the Badges screen, with how many are earned. */
+function BadgesEntry() {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const router = useRouter();
+  const achievements = useAchievements();
+  const badges = achievements.data?.badges;
+  const earned = badges ? earnedCount(badges) : 0;
+  const total = badges?.length ?? 0;
+  return (
+    <Pressable
+      onPress={() => router.push('/badges')}
+      accessibilityRole="button"
+      accessibilityLabel={t('achievements.entryA11y', { earned, total })}
+      style={({ pressed }) => [styles.badgesEntry, pressed && styles.pressed]}>
+      <View style={styles.badgesMedal}>
+        <AppIcon name="medal-outline" size="lg" color="secondaryDark" />
+      </View>
+      <View style={styles.flex}>
+        <AppText variant="cardTitleSmall">{t('achievements.entryTitle')}</AppText>
+        <AppText variant="caption" color="inkSoft">
+          {badges ? t('achievements.entrySubtitle', { earned, total }) : t('achievements.subtitle')}
+        </AppText>
+        {badges ? (
+          <View style={styles.badgeDots}>
+            {badges.map((entry) => (
+              <AppIcon
+                key={entry.badge.id}
+                name={(entry.earned ? entry.badge.icon : 'lock-outline') as IconName}
+                size="xs"
+                color={entry.earned ? 'secondaryDark' : 'muted'}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+      <AppIcon name="chevron-right" size="md" color="muted" />
+    </Pressable>
   );
 }
 
@@ -427,6 +512,39 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
   },
   gear: {
     margin: 0,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  certificateButton: {
+    alignSelf: 'flex-start',
+  },
+  badgesEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: layout.hairline,
+    borderColor: colors.secondary,
+    ...elevation.card,
+  },
+  badgesMedal: {
+    width: layout.iconBadge + spacing.xs,
+    height: layout.iconBadge + spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.secondarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeDots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   scroll: {
     paddingBottom: layout.snackbarOffset,

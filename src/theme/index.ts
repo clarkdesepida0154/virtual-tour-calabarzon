@@ -139,6 +139,19 @@ export const layout = {
   onboardingPlate: 184,
   /** Gold ring drawn just inside the onboarding plate. */
   onboardingRingInset: 12,
+  /** Run 6: a badge medallion on the Badges grid. */
+  badgeMedal: 64,
+  /** Run 6: one tap target of the star-rating input. */
+  starTarget: 48,
+  /** Run 6: numbered trip pin (head diameter). */
+  tripPin: 30,
+  /** Run 6: the embedded route map on the planner. */
+  tripMapHeight: 240,
+  /** Run 6: the certificate's inner frame inset and the medallion behind its compass. */
+  certificateFrame: 10,
+  certificateMedal: 84,
+  /** Run 6: width of a route polyline on the planner map. */
+  routeStroke: 4,
 } as const;
 
 export const motion = {
@@ -155,6 +168,8 @@ export const motion = {
   markerSettle: 400,
   /** One beat of the narration button's pulse while it speaks. */
   narrationPulse: 900,
+  /** "Badge earned" banner on screen before it slides away. */
+  celebration: 4500,
 } as const;
 
 // ---------------------------------------------------------------------------

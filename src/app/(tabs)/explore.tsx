@@ -20,6 +20,7 @@ import { useExploreFilters } from '@/context/ExploreFiltersContext';
 import { useUserLocation } from '@/context/LocationContext';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDestinations } from '@/hooks/useDestinations';
+import { useRatingSummaries } from '@/hooks/useRatings';
 import { distanceFrom, sortByDistance } from '@/lib/geo';
 import { layout, motion, radius, spacing } from '@/theme';
 import { makeStyles, useAppTheme } from '@/theme/ThemeProvider';
@@ -48,6 +49,7 @@ export default function ExploreScreen() {
 
   // Search-as-you-type: wait for a pause in typing before asking the server.
   const debouncedQuery = useDebouncedValue(filters.query, motion.searchDebounce);
+  const ratings = useRatingSummaries();
   const list = useDestinations({
     search: debouncedQuery,
     category: filters.category,
@@ -125,6 +127,7 @@ export default function ExploreScreen() {
                 destination={item}
                 onPress={openDestination}
                 distance={km === null ? null : distance(km)}
+                rating={ratings.data?.[item.id] ?? null}
               />
             );
           }}

@@ -26,6 +26,7 @@ import { QuizOptionCard } from '@/components/QuizOptionCard';
 import type { OptionState } from '@/components/QuizOptionCard';
 import { EmptyState, ErrorState } from '@/components/StateViews';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
+import { useAchievementsCheck } from '@/context/AchievementsContext';
 import { useDataSync } from '@/context/DataSyncContext';
 import { useIdentity } from '@/context/IdentityContext';
 import { useDestination } from '@/hooks/useDestinations';
@@ -56,6 +57,7 @@ export default function QuizScreen() {
   const { userKey } = useIdentity();
   const { t } = useI18n();
   const { notifyChanged } = useDataSync();
+  const { checkAchievements } = useAchievementsCheck();
   const destination = useDestination(id);
   const quiz = useQuiz(id);
   const progress = useDestinationProgress(id);
@@ -113,6 +115,7 @@ export default function QuizScreen() {
       });
       setSaveState('saved');
       notifyChanged();
+      checkAchievements();
     } catch {
       setSaveState('error');
     }
@@ -167,6 +170,7 @@ export default function QuizScreen() {
         count={quiz.data.length}
         best={progress.data?.best ?? null}
         attempts={progress.data?.attempts ?? 0}
+        auto={quiz.data.some((question) => question.source === 'auto')}
         onStart={start}
       />
     );
@@ -251,12 +255,15 @@ function IntroCard({
   count,
   best,
   attempts,
+  auto,
   onStart,
 }: {
   name: string;
   count: number;
   best: BestScore | null;
   attempts: number;
+  /** Run 6: a starter quiz generated from a user-added destination's own details. */
+  auto: boolean;
   onStart: () => void;
 }) {
   const styles = useStyles();
@@ -271,9 +278,12 @@ function IntroCard({
           {t('quiz.intro.title', { name })}
         </AppText>
         <View style={styles.rule} />
+        {auto ? (
+          <Badge icon="auto-fix" label={t('autoQuiz.badge')} tone="gold" accessibilityLabel={t('autoQuiz.badgeA11y')} style={styles.autoBadge} />
+        ) : null}
         <View style={styles.introFacts}>
           <IntroFact icon="format-list-numbered" text={t('quiz.intro.questions', { count })} />
-          <IntroFact icon="book-open-page-variant-outline" text={t('quiz.intro.evidence')} />
+          <IntroFact icon="book-open-page-variant-outline" text={t(auto ? 'autoQuiz.evidence' : 'quiz.intro.evidence')} />
           <IntroFact icon="refresh" text={t('quiz.intro.retake')} />
         </View>
         {best ? (
@@ -578,6 +588,9 @@ const useStyles = makeStyles(({ colors, elevation }) => ({
     backgroundColor: colors.secondarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  autoBadge: {
+    alignSelf: 'center',
   },
   introFacts: {
     alignSelf: 'stretch',

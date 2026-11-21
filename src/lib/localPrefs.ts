@@ -98,3 +98,45 @@ export async function writePreferencesRaw(value: string): Promise<void> {
     // Not fatal: the choice still applies until the app is closed.
   }
 }
+
+// ---------------------------------------------------------------------------
+// Run 6: badges already celebrated (per user key) and the certificate name
+// ---------------------------------------------------------------------------
+
+const seenBadgesKey = (userKey: string) => `vtour.badgesSeen.${userKey}`;
+const CERTIFICATE_NAME_KEY = 'vtour.certificateName';
+
+/** The raw "seen badges" list for a user key (parse with `parseSeenBadges`). */
+export async function readSeenBadgesRaw(userKey: string): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(seenBadgesKey(userKey));
+  } catch {
+    return null;
+  }
+}
+
+export async function writeSeenBadges(userKey: string, ids: readonly string[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(seenBadgesKey(userKey), JSON.stringify([...ids]));
+  } catch {
+    // Not fatal: at worst a celebration shows once more.
+  }
+}
+
+/** The name the person typed for their certificates ('' when none). */
+export async function readCertificateName(): Promise<string> {
+  try {
+    return (await AsyncStorage.getItem(CERTIFICATE_NAME_KEY)) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export async function writeCertificateName(name: string): Promise<void> {
+  try {
+    if (name.trim()) await AsyncStorage.setItem(CERTIFICATE_NAME_KEY, name);
+    else await AsyncStorage.removeItem(CERTIFICATE_NAME_KEY);
+  } catch {
+    // Not fatal: the name still shows until the screen closes.
+  }
+}

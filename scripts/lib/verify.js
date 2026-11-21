@@ -23,6 +23,7 @@ const EXPECTED_TABLES = [
   'quiz_attempts',
   'quiz_options',
   'quiz_questions',
+  'ratings',
 ];
 const POLICIES_PER_TABLE = 4;
 const URLS_TO_CHECK = 5;
