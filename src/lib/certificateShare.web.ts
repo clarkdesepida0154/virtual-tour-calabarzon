@@ -7,7 +7,8 @@ import type { ComponentRef, RefObject } from 'react';
 import { Share } from 'react-native';
 import type { View } from 'react-native';
 
-export type CertificateShareOutcome = 'shared' | 'dismissed' | 'unavailable';
+import type { CertificateShareOutcome } from './certificateShareFlow';
+export type { CertificateShareOutcome };
 
 export async function shareCertificateImage(
   _view: RefObject<ComponentRef<typeof View> | null>,
