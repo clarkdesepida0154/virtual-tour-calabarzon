@@ -1004,7 +1004,10 @@ Run 8 (device-test upgrades) — complete
 - [x] In-app 360° step (Maps Embed API in react-native-webview) between Gallery and Chapter I; Details "View in 360°" deep link + "Open in Google Maps"
 - [x] Panorama curation at build time: 25 of 26 with a panorama; `has_panorama` migration + non-destructive sync (counts unchanged)
 - [x] QA: 168 unit, 50 db:test, 6 auth:test, 243 web click-through (205 earlier + 38 Run 8), 688 i18n keys, data:check, db:verify, secrets:check, tsc, lint, expo-doctor 20/20, Android Hermes export
-- [x] Ship v1.1.1 (versionCode 4)
+- [x] APK v1.1.1 (versionCode 4, EAS build `59baab37-ea5c-49b4-b6e7-7bd09b31ce59`, same keystore SHA-1; Maps SDK key in the manifest, Embed key in the bundle, WebView native code present) on GitHub Releases (Latest): https://github.com/clarkdesepida0154/virtual-tour-calabarzon/releases/tag/v1.1.1
+- [x] Web demo redeployed; live checks 10/10 (Home, Explore 26, Details deep link + reload, 360° step with Google's real panorama, planner OSRM road route)
+- [x] Docs: Technical Documentation (sections 9 routing, 10 360°), User Manual (tour + planner + FAQ, new captures), Wireframes (planner route updated, new 360° page; 23 pages), PDFs rebuilt; README
+- [ ] Owner: device-test v1.1.1 (see "Not yet verified on a device")
 
 **The roadmap is complete.** Remaining owner-side optional items: restrict the
 Google Maps key to the package name + SHA-1 `D1:36:82:72:91:88:2B:15:11:F9:72:26:77:8C:64:8A:B8:C9:B4:25`
@@ -1020,6 +1023,13 @@ gate the button on it, always showing it for user-added destinations).
   changes: add a file to `supabase/migrations/` and run `npm run db:migrate`
   (never `db:setup` on the live project). Then `npm run db:verify` and
   `npm run db:test`.
+- **Verify an APK without Android build tools** (Run 8): this machine has no
+  aapt / apksigner. A small Node script that reads the ZIP, parses the
+  binary AndroidManifest (package, versionName / versionCode, the
+  `com.google.android.geo.API_KEY` meta-data), searches
+  `assets/index.android.bundle` for the Embed key and hashes the
+  certificate in the APK Signature Scheme v2 block (SHA-1) did the job; it
+  lived in the session scratchpad — rewrite it if needed.
 - **Rebuild the APK**: bump `version` and `android.versionCode` in `app.json`
   (and `package.json` version), commit, then
   `cd /c/dev/vtour && EAS_NO_VCS=1 npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`
